@@ -12,10 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 /**
- * whatever the string pass in controller decorator it will be appended to
- * API URL. to call any API from this controller you need to add prefix which is
- * passed in controller decorator.
- * in our case our base URL is http://localhost:3000/user
+ * http://localhost:3000/user
  */
 @Controller('user')
 export class UserController {
