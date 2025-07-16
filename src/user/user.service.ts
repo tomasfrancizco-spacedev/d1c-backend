@@ -11,28 +11,30 @@ export class UserService {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {}
 
-  createUser(createUserDto: CreateUserDto): Promise<User> {
-    const user: User = new User();
-    user.email = createUserDto.email;
-    user.wallet = createUserDto.wallet;
-    user.isActive = createUserDto.isActive;
-    user.lastLogin = new Date(); // Set current timestamp for first login
-    user.currentLinkedCollege = createUserDto.currentLinkedCollege;
-    user.linkedCollegeHistory = createUserDto.linkedCollegeHistory;
-    return this.userRepository.save(user);
+  async createUser(createUserDto: CreateUserDto): Promise<User> {
+    const user = this.userRepository.create({
+      email: createUserDto.email,
+      wallet: createUserDto.wallet,
+      isActive: createUserDto.isActive,
+      lastLogin: new Date(),
+      currentLinkedCollege: createUserDto.currentLinkedCollege,
+      linkedCollegeHistory: createUserDto.linkedCollegeHistory,
+    });
+    
+    return await this.userRepository.save(user);
   }
 
-  findAllUser(): Promise<User[]> {
-    return this.userRepository.find();
+  async findAllUser(): Promise<User[]> {
+    return await this.userRepository.find();
   }
 
   /**
-   * this function used to get data of use whose id is passed in parameter
+   * this function used to get data of user whose id is passed in parameter
    * @param id is type of number, which represent the id of user.
    * @returns promise of user
    */
-  viewUser(id: number): Promise<User> {
-    return this.userRepository.findOneBy({ id }) as Promise<User>;
+  async viewUser(id: number): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { id } });
   }
 
   /**
@@ -40,8 +42,8 @@ export class UserService {
    * @param email string representing the user's email
    * @returns promise of user or null
    */
-  findUserByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOneBy({ email });
+  async findUserByEmail(email: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { email } });
   }
 
   /**
@@ -49,11 +51,9 @@ export class UserService {
    * @param userId the ID of the user logging in
    * @returns promise of updated user
    */
-  updateLastLogin(userId: number): Promise<User> {
-    return this.userRepository.save({
-      id: userId,
-      lastLogin: new Date(),
-    });
+  async updateLastLogin(userId: number): Promise<User | null> {
+    await this.userRepository.update(userId, { lastLogin: new Date() });
+    return await this.viewUser(userId);
   }
 
   /**
@@ -67,11 +67,11 @@ export class UserService {
     
     if (existingUser) {
       // User exists, update lastLogin
-      await this.updateLastLogin(existingUser.id);
-      return this.viewUser(existingUser.id);
+      const updatedUser = await this.updateLastLogin(existingUser.id);
+      return updatedUser || existingUser; // Return updated user or fallback to existing user
     } else {
       // First login, create new user
-      return this.createUser(createUserDto);
+      return await this.createUser(createUserDto);
     }
   }
 
@@ -80,25 +80,24 @@ export class UserService {
    * parameter along with passed updated data
    * @param id is type of number, which represent the id of user.
    * @param updateUserDto this is partial type of createUserDto.
-   * @returns promise of udpate user
+   * @returns promise of update user
    */
-  updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const user: User = new User();
-    user.email = updateUserDto.email ?? '';
-    user.wallet = updateUserDto.wallet ?? '';
-    user.isActive = updateUserDto.isActive ?? false;
-    user.currentLinkedCollege = updateUserDto.currentLinkedCollege ?? '';
-    user.linkedCollegeHistory = updateUserDto.linkedCollegeHistory ?? [];
-    user.id = id;
-    return this.userRepository.save(user);
+  async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User | null> {
+    const updateResult = await this.userRepository.update(id, updateUserDto);
+    
+    if (updateResult.affected && updateResult.affected > 0) {
+      return await this.viewUser(id);
+    }
+    
+    return null;
   }
 
   /**
    * this function is used to remove or delete user from database.
    * @param id is the type of number, which represent id of user
-   * @returns nuber of rows deleted or affected
+   * @returns number of rows deleted or affected
    */
-  removeUser(id: number): Promise<DeleteResult> {
-    return this.userRepository.delete(id);
+  async removeUser(id: number): Promise<DeleteResult> {
+    return await this.userRepository.delete(id);
   }
 }
