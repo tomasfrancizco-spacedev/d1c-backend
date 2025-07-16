@@ -15,7 +15,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         password: configService.get('POSTGRES_PASSWORD'),
         database: configService.get('POSTGRES_DB'),
         entities: [`${__dirname}/../**/*.entity.*`],
+        migrations: [`${__dirname}/migrations/*{.ts,.js}`],
         synchronize: false,
+        migrationsRun: true, // Automatically run migrations on startup
+        logging: configService.get('NODE_ENV') === 'development',
       }),
     }),
   ],
