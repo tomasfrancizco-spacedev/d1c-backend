@@ -19,6 +19,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         synchronize: false,
         migrationsRun: true, // Automatically run migrations on startup
         logging: configService.get('NODE_ENV') === 'development',
+        ssl: {
+          rejectUnauthorized: false
+        }
       }),
     }),
   ],
