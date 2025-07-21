@@ -8,7 +8,7 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "node dist/main",
+    "start": "node dist/src/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -27,7 +27,8 @@
     "pm2:start:app": "pm2 start app.json",
     "pm2:stop:app": "pm2 stop app.json",
     "pm2:destroy:app": "pm2 delete app.json",
-    "pm2:restart:app": "pm2 restart app.json"
+    "pm2:restart:app": "pm2 restart app.json",
+    "db:reset": "ts-node scripts/reset-db.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
