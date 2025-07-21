@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeleteResult, Repository } from 'typeorm';
+import { DeepPartial, DeleteResult, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
@@ -12,16 +12,17 @@ export class UserService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    const user = this.userRepository.create({
+    return await this.userRepository.save({
       email: createUserDto.email,
-      wallet: createUserDto.wallet,
+      walletAddress: createUserDto.walletAddress,
+      wallets: createUserDto.wallets,
+      lastLogin: createUserDto.lastLogin,
       isActive: createUserDto.isActive,
-      lastLogin: new Date(),
       currentLinkedCollege: createUserDto.currentLinkedCollege,
       linkedCollegeHistory: createUserDto.linkedCollegeHistory,
-    });
-    
-    return await this.userRepository.save(user);
+      otpCode: createUserDto.otpCode,
+      otpExpiration: createUserDto.otpExpiration,
+    } as DeepPartial<User>);
   }
 
   async findAllUser(): Promise<User[]> {

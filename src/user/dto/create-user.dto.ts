@@ -7,6 +7,7 @@ import {
   Matches,
   IsOptional,
   ArrayNotEmpty,
+  IsDate,
 } from 'class-validator';
 
 // Solana address regex pattern - base58 encoded, 32-44 characters
@@ -21,27 +22,48 @@ export class CreateUserDto {
   @IsNotEmpty()
   @IsString()
   @Matches(SOLANA_ADDRESS_REGEX, {
-    message: 'Wallet must be a valid Solana address (32-44 base58 characters)',
+    message: 'Wallet address must be a valid Solana address (32-44 base58 characters)',
   })
-  wallet: string;
+  walletAddress: string;
+
+  @IsNotEmpty()
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(SOLANA_ADDRESS_REGEX, {
+    each: true,
+    message: 'Each wallet address must be a valid Solana address (32-44 base58 characters)',
+  })
+  wallets: string[];
 
   @IsBoolean()
   isActive: boolean;
+
+  @IsNotEmpty()
+  @IsString()
+  otpCode: string | null;
+
+  @IsNotEmpty()
+  @IsDate()
+  otpExpiration: Date | null;
 
   @IsOptional()
   @IsString()
   @Matches(SOLANA_ADDRESS_REGEX, {
     message: 'Current linked college must be a valid Solana address (32-44 base58 characters)',
   })
-  currentLinkedCollege: string;
+  currentLinkedCollege: string | null;
 
   @IsOptional()
   @IsArray()
-  @ArrayNotEmpty({ message: 'Linked college history cannot be empty if provided' })
+  // @ArrayNotEmpty({ message: 'Linked college history cannot be empty if provided' })
   @IsString({ each: true })
   @Matches(SOLANA_ADDRESS_REGEX, {
     each: true,
     message: 'Each linked college history entry must be a valid Solana address (32-44 base58 characters)',
   })
-  linkedCollegeHistory: string[];
+  linkedCollegeHistory: string[] | null;
+
+  @IsOptional()
+  @IsDate()
+  lastLogin: Date | null;
 }
