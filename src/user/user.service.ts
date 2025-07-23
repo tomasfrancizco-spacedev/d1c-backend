@@ -48,6 +48,15 @@ export class UserService {
   }
 
   /**
+   * this function is used to find a user by wallet address
+   * @param walletAddress string representing the user's wallet address
+   * @returns promise of user or null
+   */
+  async findUserByWalletAddress(walletAddress: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { walletAddress } });
+  }
+
+  /**
    * this function updates the lastLogin timestamp when user logs in
    * @param userId the ID of the user logging in
    * @returns promise of updated user

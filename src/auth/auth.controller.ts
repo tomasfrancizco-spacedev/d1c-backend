@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, ConflictException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserAuthService } from './services/user-auth.service';
 import { AuthService } from './services/auth.service';
@@ -24,10 +24,21 @@ export class AuthController {
     status: 200,
     description: 'OTP sent to email',
     schema: {
-      example: { message: 'OTP sent to your email' }
+      example: { success: true, message: 'OTP sent to your email' }
     }
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ 
+    status: 409, 
+    description: 'Wallet address already registered with another email',
+    schema: {
+      example: {
+        success: false,
+        message: 'This wallet address is already registered with another email address.',
+        code: 'WALLET_ALREADY_REGISTERED'
+      }
+    }
+  })
   async walletSignin(@Body() dto: WalletSigninDto) {
     try {
       // Create/update user and generate OTP
@@ -42,6 +53,16 @@ export class AuthController {
       return { success: true, message: 'OTP sent to your email' };
     } catch (error) {
       console.error('❌ Error in wallet signin:', error);
+      
+      // Handle specific wallet conflict error
+      if (error instanceof ConflictException) {
+        throw new ConflictException({
+          success: false,
+          message: error.message,
+          code: 'WALLET_ALREADY_REGISTERED'
+        });
+      }
+      
       throw error;
     }
   }

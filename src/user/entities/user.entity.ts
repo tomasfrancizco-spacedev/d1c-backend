@@ -8,7 +8,7 @@ export class User {
   @Column({ type: 'varchar', length: 40, unique: true })
   email: string;
 
-  @Column({ type: 'varchar', length: 44 })
+  @Column({ type: 'varchar', length: 44, unique: true })
   walletAddress: string;
 
   @Column({ type: 'varchar', array: true, nullable: true })

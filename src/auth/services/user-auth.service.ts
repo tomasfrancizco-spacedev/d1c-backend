@@ -1,6 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { User } from '../../user/entities/user.entity';
 import { OtpUtil } from '../utils/otp.util';
 import { UserService } from 'src/user/user.service';
@@ -8,8 +6,6 @@ import { UserService } from 'src/user/user.service';
 @Injectable()
 export class UserAuthService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     private userService: UserService,
   ) { }
 
@@ -21,6 +17,15 @@ export class UserAuthService {
     let user = await this.userService.findUserByEmail(email);
 
     if (user) {
+      // User exists - check if they're trying to change their wallet
+      if (user.walletAddress !== walletAddress) {
+        // They're trying to use a different wallet - check if it's already taken
+        const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
+        if (existingWalletUser && existingWalletUser.email !== email) {
+          throw new ConflictException(`This wallet address is already registered with another email address.`);
+        }
+      }
+
       // Update existing user with wallets logic + OTP
       const updatedWallets = user.wallets?.includes(walletAddress) ? user.wallets : [...(user.wallets || []), walletAddress];
 
@@ -31,6 +36,12 @@ export class UserAuthService {
         otpExpiration,
       });
     } else {
+      // New user - check if wallet is already taken by someone else
+      const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
+      if (existingWalletUser) {
+        throw new ConflictException(`This wallet address is already registered with another email address.`);
+      }
+
       // Create new user via UserService
       user = await this.userService.createUser({
         email,

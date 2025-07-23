@@ -55,7 +55,6 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsArray()
-  // @ArrayNotEmpty({ message: 'Linked college history cannot be empty if provided' })
   @IsString({ each: true })
   @Matches(SOLANA_ADDRESS_REGEX, {
     each: true,
