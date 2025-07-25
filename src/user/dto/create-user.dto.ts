@@ -9,16 +9,9 @@ import {
   ArrayNotEmpty,
   IsDate,
 } from 'class-validator';
-
-// Solana address regex pattern - base58 encoded, 32-44 characters
-const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+import { SOLANA_ADDRESS_REGEX } from 'src/utils/solanaAddressRegex';
 
 export class CreateUserDto {
-  @IsNotEmpty()
-  @IsString()
-  @IsEmail(undefined, { message: 'Please provide a valid email' })
-  email: string;
-
   @IsNotEmpty()
   @IsString()
   @Matches(SOLANA_ADDRESS_REGEX, {
@@ -26,14 +19,24 @@ export class CreateUserDto {
   })
   walletAddress: string;
 
+  // @IsNotEmpty()
+  // @IsArray()
+  // @IsString({ each: true })
+  // @Matches(SOLANA_ADDRESS_REGEX, {
+  //   each: true,
+  //   message: 'Each wallet address must be a valid Solana address (32-44 base58 characters)',
+  // })
+  // wallets: string[];
+  
+  // @IsNotEmpty()
+  // @IsString()
+  // @IsEmail(undefined, { message: 'Please provide a valid email' })
+  // email: string;
+
   @IsNotEmpty()
   @IsArray()
-  @IsString({ each: true })
-  @Matches(SOLANA_ADDRESS_REGEX, {
-    each: true,
-    message: 'Each wallet address must be a valid Solana address (32-44 base58 characters)',
-  })
-  wallets: string[];
+  @IsEmail(undefined, { each: true, message: 'Each email must be a valid email' })
+  emails: string[];
 
   @IsBoolean()
   isActive: boolean;

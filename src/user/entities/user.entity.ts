@@ -5,14 +5,17 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 40, unique: true })
-  email: string;
+  // @Column({ type: 'varchar', length: 40 })
+  // email: string;
 
-  @Column({ type: 'varchar', length: 44, unique: true })
+  @Column({ type: 'varchar', array: true })
+  emails: string[];
+
+  @Column({ type: 'varchar', length: 44 })
   walletAddress: string;
 
-  @Column({ type: 'varchar', array: true, nullable: true })
-  wallets: string[];
+  // @Column({ type: 'varchar', array: true, nullable: true })
+  // wallets: string[];
 
   @Column({ type: 'boolean', default: false })
   isActive: boolean;

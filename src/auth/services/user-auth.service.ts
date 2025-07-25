@@ -14,39 +14,31 @@ export class UserAuthService {
     const otpCode = OtpUtil.generateOtp();
     const otpExpiration = OtpUtil.getExpirationTime();
 
-    let user = await this.userService.findUserByEmail(email);
+    let user = await this.userService.findUserByWalletAddress(walletAddress);
 
     if (user) {
-      // User exists - check if they're trying to change their wallet
-      if (user.walletAddress !== walletAddress) {
-        // They're trying to use a different wallet - check if it's already taken
-        const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
-        if (existingWalletUser && existingWalletUser.email !== email) {
-          throw new ConflictException(`This wallet address is already registered with another email address.`);
-        }
-      }
+      // // User exists - check if they're trying to change their wallet
+      // if (user.walletAddress !== walletAddress) {
+      //   // They're trying to use a different wallet - check if it's already taken
+      //   const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
+      //   if (existingWalletUser && existingWalletUser.email !== email) {
+      //     throw new ConflictException(`This wallet address is already registered with another email address.`);
+      //   }
+      // }
 
       // Update existing user with wallets logic + OTP
-      const updatedWallets = user.wallets?.includes(walletAddress) ? user.wallets : [...(user.wallets || []), walletAddress];
+      const updatedEmails = user.emails?.includes(email) ? user.emails : [...(user.emails || []), email];
 
       await this.userService.updateUser(user.id, {
-        wallets: updatedWallets,
-        walletAddress,
+        emails: updatedEmails,
         otpCode,
         otpExpiration,
       });
     } else {
-      // New user - check if wallet is already taken by someone else
-      const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
-      if (existingWalletUser) {
-        throw new ConflictException(`This wallet address is already registered with another email address.`);
-      }
-
       // Create new user via UserService
       user = await this.userService.createUser({
-        email,
         walletAddress,
-        wallets: [walletAddress],
+        emails: [email],
         lastLogin: null,
         isActive: false,
         currentLinkedCollege: null,
@@ -60,13 +52,17 @@ export class UserAuthService {
   }
 
   // Verify OTP and clear it from database
-  async verifyOtp(email: string, otpCode: string): Promise<User> {
-    const user = await this.userService.findUserByEmail(email);
+  async verifyOtp(walletAddress: string, email: string, otpCode: string): Promise<User> {
+    const user = await this.userService.findUserByWalletAddress(walletAddress);
 
     if (!user ||
       !user.otpCode ||
       (user.otpExpiration && OtpUtil.isExpired(user.otpExpiration))) {
       throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    if (!user.emails.includes(email)) {
+      throw new UnauthorizedException('Invalid email');
     }
 
     if (user.otpCode !== otpCode) {
@@ -77,6 +73,8 @@ export class UserAuthService {
       throw new UnauthorizedException('Invalid OTP');
     }
 
+    // TODO: add 5 minutes time to request again OTP
+
     // Clear OTP and update last login
     await this.userService.updateUser(user.id, {
       otpCode: null,
@@ -86,7 +84,7 @@ export class UserAuthService {
     });
 
     // Return updated user
-    const updatedUser = await this.userService.findUserByEmail(email);
+    const updatedUser = await this.userService.findUserByWalletAddress(walletAddress);
     if (!updatedUser) {
       throw new UnauthorizedException('User not found after verification');
     }

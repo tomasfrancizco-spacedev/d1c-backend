@@ -28,8 +28,8 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiResponse({ 
-    status: 409, 
+  @ApiResponse({
+    status: 409,
     description: 'Wallet address already registered with another email',
     schema: {
       example: {
@@ -53,7 +53,7 @@ export class AuthController {
       return { success: true, message: 'OTP sent to your email' };
     } catch (error) {
       console.error('❌ Error in wallet signin:', error);
-      
+
       // Handle specific wallet conflict error
       if (error instanceof ConflictException) {
         throw new ConflictException({
@@ -62,7 +62,7 @@ export class AuthController {
           code: 'WALLET_ALREADY_REGISTERED'
         });
       }
-      
+
       throw error;
     }
   }
@@ -88,26 +88,26 @@ export class AuthController {
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     try {
       // Validate OTP
-      const user = await this.userAuthService.verifyOtp(dto.email, dto.otpCode);
+      const user = await this.userAuthService.verifyOtp(dto.walletAddress, dto.email, dto.otpCode);
 
       // Generate JWT
       const token = this.authService.generateToken({
-      id: user.id,
-      email: user.email,
-      walletAddress: user.walletAddress
-    });
-
-    return {
-      success: true,
-      token,
-      user: {
         id: user.id,
-        email: user.email,
-        walletAddress: user.walletAddress,
-        isActive: user.isActive,
-        lastLogin: user.lastLogin
-      }
-    };
+        email: user.emails[user.emails.length - 1],
+        walletAddress: user.walletAddress
+      });
+
+      return {
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          email: user.emails[user.emails.length - 1],
+          walletAddress: user.walletAddress,
+          isActive: user.isActive,
+          lastLogin: user.lastLogin
+        }
+      };
     } catch (error) {
       console.error('❌ Error in verify OTP:', error);
       throw error;

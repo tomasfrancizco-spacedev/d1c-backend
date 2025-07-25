@@ -9,7 +9,7 @@ async function resetDatabase() {
     
     // Drop tables in correct order (due to foreign keys)
     await AppDataSource.query('DROP TABLE IF EXISTS "user" CASCADE;');
-    await AppDataSource.query('DROP TABLE IF EXISTS "college" CASCADE;');
+    // await AppDataSource.query('DROP TABLE IF EXISTS "college" CASCADE;');
     
     console.log('✅ Database tables dropped successfully');
     
