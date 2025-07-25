@@ -6,10 +6,10 @@ import {
   IsArray,
   Matches,
   IsOptional,
-  ArrayNotEmpty,
   IsDate,
 } from 'class-validator';
 import { SOLANA_ADDRESS_REGEX } from 'src/utils/solanaAddressRegex';
+import { Type } from 'class-transformer';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -18,20 +18,6 @@ export class CreateUserDto {
     message: 'Wallet address must be a valid Solana address (32-44 base58 characters)',
   })
   walletAddress: string;
-
-  // @IsNotEmpty()
-  // @IsArray()
-  // @IsString({ each: true })
-  // @Matches(SOLANA_ADDRESS_REGEX, {
-  //   each: true,
-  //   message: 'Each wallet address must be a valid Solana address (32-44 base58 characters)',
-  // })
-  // wallets: string[];
-  
-  // @IsNotEmpty()
-  // @IsString()
-  // @IsEmail(undefined, { message: 'Please provide a valid email' })
-  // email: string;
 
   @IsNotEmpty()
   @IsArray()
@@ -47,6 +33,7 @@ export class CreateUserDto {
 
   @IsNotEmpty()
   @IsDate()
+  @Type(() => Date)
   otpExpiration: Date | null;
 
   @IsOptional()
@@ -67,5 +54,6 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsDate()
+  @Type(() => Date)
   lastLogin: Date | null;
 }
