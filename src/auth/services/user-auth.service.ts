@@ -17,16 +17,6 @@ export class UserAuthService {
     let user = await this.userService.findUserByWalletAddress(walletAddress);
 
     if (user) {
-      // // User exists - check if they're trying to change their wallet
-      // if (user.walletAddress !== walletAddress) {
-      //   // They're trying to use a different wallet - check if it's already taken
-      //   const existingWalletUser = await this.userService.findUserByWalletAddress(walletAddress);
-      //   if (existingWalletUser && existingWalletUser.email !== email) {
-      //     throw new ConflictException(`This wallet address is already registered with another email address.`);
-      //   }
-      // }
-
-      // Update existing user with wallets logic + OTP
       const updatedEmails = user.emails?.includes(email) ? user.emails : [...(user.emails || []), email];
 
       await this.userService.updateUser(user.id, {

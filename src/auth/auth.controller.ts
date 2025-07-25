@@ -93,7 +93,7 @@ export class AuthController {
       // Generate JWT
       const token = this.authService.generateToken({
         id: user.id,
-        email: user.emails[user.emails.length - 1],
+        email: dto.email,
         walletAddress: user.walletAddress
       });
 
@@ -102,7 +102,7 @@ export class AuthController {
         token,
         user: {
           id: user.id,
-          email: user.emails[user.emails.length - 1],
+          email: dto.email,
           walletAddress: user.walletAddress,
           isActive: user.isActive,
           lastLogin: user.lastLogin

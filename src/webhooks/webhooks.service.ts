@@ -40,9 +40,9 @@ export class WebhooksService {
   }
 
   private async handleUserTransaction(user: any, transaction: HeliusWebhookDto): Promise<void> {
-    this.logger.log(`Transaction involves user ${user.email}: ${transaction.signature}`);
+    this.logger.log(`Transaction involves user ${user.walletAddress}: ${transaction.signature}`);
 
-    console.log(`User ${user.email} had transaction: ${transaction.signature}`);
+    console.log(`User ${user.walletAddress} had transaction: ${transaction.signature}`);
 
     // Create TRANSACTIONS table record
     await this.createTransactionRecord(user, transaction);
@@ -98,7 +98,6 @@ export class WebhooksService {
       this.logger.log(`Transaction record created with ID: ${transactionRecord.id}`);
     } catch (error) {
       this.logger.error(`Error saving transaction ${transaction.signature}:`, error);
-      // Don't throw - we want to continue processing other transactions
     }
   }
 
@@ -112,7 +111,6 @@ export class WebhooksService {
   }
 
   private extractFromAddress(transaction: HeliusWebhookDto): string | null {
-    // Extract from address from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].fromUserAccount || null;
     }
@@ -120,7 +118,6 @@ export class WebhooksService {
   }
 
   private extractToAddress(transaction: HeliusWebhookDto): string | null {
-    // Extract to address from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].toUserAccount || null;
     }
@@ -128,7 +125,6 @@ export class WebhooksService {
   }
 
   private extractAmount(transaction: HeliusWebhookDto): number {
-    // Extract amount from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].tokenAmount || 0;
     }
