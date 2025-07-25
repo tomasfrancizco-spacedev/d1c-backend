@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import { User } from '../../utils/user/entities/user.entity';
+import { User } from '../../user/entities/user.entity';
 import { OtpUtil } from '../utils/otp.util';
-import { UserService } from 'src/utils/user/user.service';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class UserAuthService {

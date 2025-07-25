@@ -6,7 +6,7 @@ import { AuthService } from './services/auth.service';
 import { EmailService } from './services/email.service';
 import { UserAuthService } from './services/user-auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { UserModule } from 'src/utils/user/user.module';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
   imports: [

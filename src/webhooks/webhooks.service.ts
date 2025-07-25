@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { UserService } from '../utils/user/user.service';
+import { UserService } from '../user/user.service';
 import { HeliusWebhookDto } from './dto/helius-webhook.dto';
 import { TransactionService } from '../transaction/transaction.service';
 import { D1cWalletService } from '../d1c-wallet/d1c-wallet.service';
