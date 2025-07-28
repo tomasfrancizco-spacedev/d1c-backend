@@ -33,6 +33,12 @@ export class CollegeService {
     return await this.collegeRepository.findOne({ where: { id } });
   }
 
+  async findByWalletAddress(walletAddress: string): Promise<College | null> {
+    return this.collegeRepository.findOne({
+      where: { walletAddress }
+    });
+  }
+
   async updateCollege(id: number, updateCollegeDto: UpdateCollegeDto): Promise<College | null> {
     const updateResult = await this.collegeRepository.update(id, updateCollegeDto);
     
