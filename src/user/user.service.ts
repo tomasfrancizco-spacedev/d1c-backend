@@ -13,9 +13,8 @@ export class UserService {
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
     return await this.userRepository.save({
-      email: createUserDto.email,
       walletAddress: createUserDto.walletAddress,
-      wallets: createUserDto.wallets,
+      emails: createUserDto.emails,
       lastLogin: createUserDto.lastLogin,
       isActive: createUserDto.isActive,
       currentLinkedCollege: createUserDto.currentLinkedCollege,
@@ -39,12 +38,15 @@ export class UserService {
   }
 
   /**
-   * this function is used to find a user by email
+   * this function is used to find users by email in emails array
    * @param email string representing the user's email
    * @returns promise of user or null
    */
-  async findUserByEmail(email: string): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { email } });
+  async findUsersByEmail(email: string): Promise<User[] | null> {
+    return await this.userRepository
+      .createQueryBuilder('user')
+      .where(':email = ANY(user.emails)', { email })
+      .getMany();
   }
 
   /**
@@ -68,12 +70,12 @@ export class UserService {
 
   /**
    * this function handles user login - creates user on first login or updates lastLogin
-   * @param email user's email
+   * @param walletAddress user's wallet address
    * @param createUserDto user data for first-time login
    * @returns promise of user
    */
-  async handleUserLogin(email: string, createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.findUserByEmail(email);
+  async handleUserLogin(walletAddress: string, createUserDto: CreateUserDto): Promise<User> {
+    const existingUser = await this.findUserByWalletAddress(walletAddress);
     
     if (existingUser) {
       // User exists, update lastLogin

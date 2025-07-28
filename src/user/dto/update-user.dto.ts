@@ -1,16 +1,12 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateUserDto } from './create-user.dto';
-import { IsArray, IsDate, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDate, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsNotEmpty()
   @IsArray()
-  @IsString({ each: true })
-  wallets?: string[];
-
-  @IsNotEmpty()
-  @IsString()
-  walletAddress?: string;
+  @IsEmail(undefined, { each: true, message: 'Each email must be a valid email' })
+  emails?: string[];
 
   @IsNotEmpty()
   @IsString()

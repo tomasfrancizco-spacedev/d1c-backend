@@ -3,6 +3,7 @@ import { UserService } from '../user/user.service';
 import { HeliusWebhookDto } from './dto/helius-webhook.dto';
 import { TransactionService } from '../transaction/transaction.service';
 import { D1cWalletService } from '../d1c-wallet/d1c-wallet.service';
+import { StatsService } from '../stats/stats.service';
 
 @Injectable()
 export class WebhooksService {
@@ -12,6 +13,7 @@ export class WebhooksService {
     private readonly userService: UserService,
     private readonly transactionService: TransactionService,
     private readonly d1cWalletService: D1cWalletService,
+    private readonly statsService: StatsService,
   ) { }
 
   async processTransaction(transaction: HeliusWebhookDto): Promise<void> {
@@ -40,9 +42,9 @@ export class WebhooksService {
   }
 
   private async handleUserTransaction(user: any, transaction: HeliusWebhookDto): Promise<void> {
-    this.logger.log(`Transaction involves user ${user.email}: ${transaction.signature}`);
+    this.logger.log(`Transaction involves user ${user.walletAddress}: ${transaction.signature}`);
 
-    console.log(`User ${user.email} had transaction: ${transaction.signature}`);
+    console.log(`User ${user.walletAddress} had transaction: ${transaction.signature}`);
 
     // Create TRANSACTIONS table record
     await this.createTransactionRecord(user, transaction);
@@ -53,10 +55,10 @@ export class WebhooksService {
 
     // Create TRANSACTIONS table record without user data
     // Use community wallet from D1C_WALLETS table
-    await this.createTransactionRecord(null, transaction, walletAddress);
+    await this.createTransactionRecord(null, transaction);
   }
 
-  private async createTransactionRecord(user: any | null, transaction: HeliusWebhookDto, walletAddress?: string): Promise<void> {
+  private async createTransactionRecord(user: any | null, transaction: HeliusWebhookDto): Promise<void> {
     // Extract transaction data
     const fromAddress = this.extractFromAddress(transaction);
     const toAddress = this.extractToAddress(transaction);
@@ -96,9 +98,18 @@ export class WebhooksService {
       });
 
       this.logger.log(`Transaction record created with ID: ${transactionRecord.id}`);
+
+      await this.updateStatsAfterTransaction(
+        user,
+        amount,
+        new Date(parseInt(transaction.timestamp) * 1000),
+        fromAddress,
+        linkedSchoolWallet
+      );
+
+
     } catch (error) {
       this.logger.error(`Error saving transaction ${transaction.signature}:`, error);
-      // Don't throw - we want to continue processing other transactions
     }
   }
 
@@ -112,7 +123,6 @@ export class WebhooksService {
   }
 
   private extractFromAddress(transaction: HeliusWebhookDto): string | null {
-    // Extract from address from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].fromUserAccount || null;
     }
@@ -120,7 +130,6 @@ export class WebhooksService {
   }
 
   private extractToAddress(transaction: HeliusWebhookDto): string | null {
-    // Extract to address from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].toUserAccount || null;
     }
@@ -128,10 +137,50 @@ export class WebhooksService {
   }
 
   private extractAmount(transaction: HeliusWebhookDto): number {
-    // Extract amount from token transfers only
     if (transaction.tokenTransfers?.length > 0) {
       return transaction.tokenTransfers[0].tokenAmount || 0;
     }
     return 0;
+  }
+
+  private async updateStatsAfterTransaction(
+    user: any | null,
+    amount: number,
+    transactionDate: Date,
+    fromAddress: string | null,
+    linkedSchoolWallet: string | null
+  ): Promise<void> {
+    try {
+      // Update user stats if user exists
+      if (user) {
+        await this.statsService.updateUserStats(
+          user.id,
+          user.walletAddress,
+          amount,
+          transactionDate
+        );
+      }
+
+      // Update college stats if linked school wallet exists
+      if (linkedSchoolWallet) {
+        await this.statsService.updateCollegeStats(
+          linkedSchoolWallet,
+          amount,
+          transactionDate
+        );
+      }
+
+      // Update trading volume stats
+      await this.statsService.updateTradingVolumeStats(
+        amount,
+        transactionDate,
+        fromAddress || undefined,
+        linkedSchoolWallet || undefined
+      );
+
+      this.logger.log(`Successfully updated all stats for transaction amount: ${amount}`);
+    } catch (error) {
+      this.logger.error('Error updating stats after transaction:', error);
+    }
   }
 }

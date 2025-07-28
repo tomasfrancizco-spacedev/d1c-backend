@@ -7,6 +7,7 @@ import { CollegeModule } from './college/college.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CollegeModule,
     AuthModule,
     WebhooksModule,
+    StatsModule
   ],
   controllers: [AppController],
   providers: [AppService],

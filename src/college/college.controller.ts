@@ -24,7 +24,7 @@ export class CollegeController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateCollegeDto: UpdateCollegeDto) {
-    return this.collegeService.update(+id, updateCollegeDto);
+    return this.collegeService.updateCollege(+id, updateCollegeDto);
   }
 
   @Delete(':id')
