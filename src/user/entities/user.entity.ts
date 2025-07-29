@@ -8,7 +8,7 @@ export class User {
   @Column({ type: 'varchar', array: true })
   emails: string[];
 
-  @Column({ type: 'varchar', length: 44 })
+  @Column({ type: 'varchar', length: 44, unique: true })
   walletAddress: string;
 
   @Column({ type: 'boolean', default: false })
@@ -17,7 +17,7 @@ export class User {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' , nullable: true })
   lastLogin: Date | null;
 
-  @Column({ type: 'varchar', length: 40, nullable: true })
+  @Column({ type: 'varchar', length: 44, nullable: true })
   currentLinkedCollege: string | null;
 
   @Column({ type: 'varchar', array: true, nullable: true })
