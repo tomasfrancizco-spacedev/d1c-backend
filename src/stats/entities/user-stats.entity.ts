@@ -6,14 +6,14 @@ export class UserStats {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'bigint' })
-  userId: number;
+  @Column({ type: 'bigint', nullable: true })
+  userId: number | null;
 
-  @OneToOne(() => User)
+  @OneToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: User | null;
 
-  @Column({ type: 'varchar', length: 44 })
+  @Column({ type: 'varchar', length: 44, unique: true })
   walletAddress: string;
 
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })

@@ -7,10 +7,12 @@ import { EmailService } from './services/email.service';
 import { UserAuthService } from './services/user-auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserModule } from 'src/user/user.module';
+import { StatsModule } from 'src/stats/stats.module';
 
 @Module({
   imports: [
     UserModule,
+    StatsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

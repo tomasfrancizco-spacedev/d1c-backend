@@ -5,6 +5,7 @@ import { UserStats } from './entities/user-stats.entity';
 import { CollegeStats } from './entities/college-stats.entity';
 import { TradingVolumeStats } from './entities/trading-volume-stats.entity';
 import { CollegeModule } from '../college/college.module';
+import { StatsController } from './stats.controller';
 
 @Module({
   imports: [
@@ -13,5 +14,6 @@ import { CollegeModule } from '../college/college.module';
   ],
   providers: [StatsService],
   exports: [StatsService],
+  controllers: [StatsController],
 })
 export class StatsModule {}
