@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, DeleteResult, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -9,39 +9,38 @@ import { User } from './entities/user.entity';
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userRepository.save({
-      walletAddress: createUserDto.walletAddress,
-      emails: createUserDto.emails,
-      lastLogin: createUserDto.lastLogin,
-      isActive: createUserDto.isActive,
-      currentLinkedCollege: createUserDto.currentLinkedCollege,
-      linkedCollegeHistory: createUserDto.linkedCollegeHistory,
-      otpCode: createUserDto.otpCode,
-      otpExpiration: createUserDto.otpExpiration,
-    } as DeepPartial<User>);
+    try {
+      const user = await this.userRepository.save({
+        walletAddress: createUserDto.walletAddress,
+        emails: createUserDto.emails,
+        lastLogin: createUserDto.lastLogin,
+        isActive: createUserDto.isActive,
+        currentLinkedCollege: createUserDto.currentLinkedCollege,
+        linkedCollegeHistory: createUserDto.linkedCollegeHistory,
+        otpCode: createUserDto.otpCode,
+        otpExpiration: createUserDto.otpExpiration,
+      } as DeepPartial<User>);
+
+      return user;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to create user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   async findAllUser(): Promise<User[]> {
     return await this.userRepository.find();
   }
 
-  /**
-   * this function used to get data of user whose id is passed in parameter
-   * @param id is type of number, which represent the id of user.
-   * @returns promise of user
-   */
   async viewUser(id: number): Promise<User | null> {
     return await this.userRepository.findOne({ where: { id } });
   }
 
-  /**
-   * this function is used to find users by email in emails array
-   * @param email string representing the user's email
-   * @returns promise of user or null
-   */
   async findUsersByEmail(email: string): Promise<User[] | null> {
     return await this.userRepository
       .createQueryBuilder('user')
@@ -49,67 +48,56 @@ export class UserService {
       .getMany();
   }
 
-  /**
-   * this function is used to find a user by wallet address
-   * @param walletAddress string representing the user's wallet address
-   * @returns promise of user or null
-   */
   async findUserByWalletAddress(walletAddress: string): Promise<User | null> {
     return await this.userRepository.findOne({ where: { walletAddress } });
   }
 
-  /**
-   * this function updates the lastLogin timestamp when user logs in
-   * @param userId the ID of the user logging in
-   * @returns promise of updated user
-   */
   async updateLastLogin(userId: number): Promise<User | null> {
-    await this.userRepository.update(userId, { lastLogin: new Date() });
-    return await this.viewUser(userId);
+    try {
+      await this.userRepository.update(userId, { lastLogin: new Date() });
+      return await this.viewUser(userId);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to update last login. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
-  /**
-   * this function handles user login - creates user on first login or updates lastLogin
-   * @param walletAddress user's wallet address
-   * @param createUserDto user data for first-time login
-   * @returns promise of user
-   */
   async handleUserLogin(walletAddress: string, createUserDto: CreateUserDto): Promise<User> {
     const existingUser = await this.findUserByWalletAddress(walletAddress);
-    
+
     if (existingUser) {
-      // User exists, update lastLogin
       const updatedUser = await this.updateLastLogin(existingUser.id);
-      return updatedUser || existingUser; // Return updated user or fallback to existing user
+      return updatedUser || existingUser;
     } else {
-      // First login, create new user
       return await this.createUser(createUserDto);
     }
   }
 
-  /**
-   * this function is used to updated specific user whose id is passed in
-   * parameter along with passed updated data
-   * @param id is type of number, which represent the id of user.
-   * @param updateUserDto this is partial type of createUserDto.
-   * @returns promise of update user
-   */
   async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User | null> {
-    const updateResult = await this.userRepository.update(id, updateUserDto);
-    
-    if (updateResult.affected && updateResult.affected > 0) {
-      return await this.viewUser(id);
+    try {
+      const updateResult = await this.userRepository.update(id, updateUserDto);
+      if (updateResult.affected && updateResult.affected > 0) {
+        return await this.viewUser(id);
+      }
+      return null;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to update user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    
-    return null;
   }
 
-  /**
-   * this function is used to remove or delete user from database.
-   * @param id is the type of number, which represent id of user
-   * @returns number of rows deleted or affected
-   */
   async removeUser(id: number): Promise<DeleteResult> {
-    return await this.userRepository.delete(id);
+    try {
+      return await this.userRepository.delete(id);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to remove user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }

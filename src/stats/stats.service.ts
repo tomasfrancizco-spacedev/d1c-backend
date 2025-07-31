@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { UserStats } from './entities/user-stats.entity';
@@ -20,20 +20,35 @@ export class StatsService {
     private collegeService: CollegeService,
   ) { }
 
-  async updateUserStats(userId: number | null, walletAddress: string, amount: number, transactionDate: Date): Promise<void> {
+  async updateUserStats(userId: number | null, walletAddress: string, amount: number, transactionDate: Date, linkedCollege?: string): Promise<void> {
     try {
+      // Use empty string for community college if no linkedCollege provided
+      const collegeWallet = linkedCollege || '';
+      
+      // Step 1: Upsert the current college row (update both contributions and totalContributions)
       await this.userStatsRepository.query(`
-        INSERT INTO user_stats ("userId", "walletAddress", "totalContributions", "transactionCount", "lastContributionDate", "createdAt", "updatedAt")
-        VALUES ($1, $2, $3, 1, $4, now(), now())
-        ON CONFLICT ("walletAddress") 
+        INSERT INTO user_stats ("userId", "walletAddress", "linkedCollege", "contributions", "totalContributions", "transactionCount", "lastContributionDate", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $4, 1, $5, now(), now())
+        ON CONFLICT ("walletAddress", "linkedCollege") 
         DO UPDATE SET
+          "contributions" = user_stats."contributions" + EXCLUDED."contributions",
           "totalContributions" = user_stats."totalContributions" + EXCLUDED."totalContributions",
           "transactionCount" = user_stats."transactionCount" + 1,
           "lastContributionDate" = GREATEST(user_stats."lastContributionDate", EXCLUDED."lastContributionDate"),
           "updatedAt" = now()
-      `, [userId, walletAddress, amount, transactionDate]);
-  
-      this.logger.log(`Updated user stats for wallet ${walletAddress}: +${amount}`);
+      `, [userId, walletAddress, collegeWallet, amount, transactionDate]);
+
+      // Step 2: Update totalContributions for ALL other rows of the same user (different colleges)
+      await this.userStatsRepository.query(`
+        UPDATE user_stats 
+        SET 
+          "totalContributions" = "totalContributions" + $1,
+          "updatedAt" = now()
+        WHERE "walletAddress" = $2 AND "linkedCollege" != $3
+      `, [amount, walletAddress, collegeWallet]);
+
+      const collegeType = collegeWallet ? `linked college ${collegeWallet}` : 'community college';
+      this.logger.log(`Updated user stats for wallet ${walletAddress} (${collegeType}): +${amount} (college-specific and total across all colleges)`);
     } catch (error) {
       this.logger.error(`Error updating user stats for wallet ${walletAddress}:`, error);
     }
@@ -118,89 +133,260 @@ export class StatsService {
   }
 
   // Leaderboard methods
-  async getUserLeaderboard(limit: number = 20): Promise<UserStats[]> {
-    return this.userStatsRepository.find({
-      relations: ['user'],
-      order: { totalContributions: 'DESC' },
-      take: limit,
-    });
+  async getUserLeaderboard(limit: number = 20): Promise<{ success: boolean, data?: UserStats[], statusCode?: number, message?: string }> {
+    try {
+      // Get top wallet addresses by totalContributions, then pick one row per wallet
+      const leaderboard = await this.userStatsRepository.query(`
+        WITH top_wallets AS (
+          SELECT DISTINCT "walletAddress", "totalContributions"
+          FROM user_stats
+          ORDER BY "totalContributions" DESC
+          LIMIT $1
+        ),
+        user_stats_with_rank AS (
+          SELECT us.*, 
+                 ROW_NUMBER() OVER (PARTITION BY us."walletAddress" ORDER BY us.id) as rn
+          FROM user_stats us
+          INNER JOIN top_wallets tw ON us."walletAddress" = tw."walletAddress"
+        )
+        SELECT 
+          us.id,
+          us."userId", 
+          us."walletAddress",
+          us."linkedCollege",
+          us."contributions",
+          us."totalContributions",
+          us."transactionCount",
+          us."lastContributionDate",
+          us."rankPosition",
+          us."createdAt",
+          us."updatedAt",
+          u.id as "user_id",
+          u.emails as "user_emails",
+          u."walletAddress" as "user_walletAddress",
+          u."isActive" as "user_isActive",
+          u."lastLogin" as "user_lastLogin",
+          u."currentLinkedCollege" as "user_currentLinkedCollege"
+        FROM user_stats_with_rank us
+        LEFT JOIN "user" u ON us."userId" = u.id
+        WHERE us.rn = 1
+        ORDER BY us."totalContributions" DESC
+      `, [limit]);
+
+      // Transform the flat result to include user relation
+      const transformedLeaderboard = leaderboard.map((row: any) => ({
+        id: row.id,
+        userId: row.userId,
+        walletAddress: row.walletAddress,
+        linkedCollege: row.linkedCollege,
+        contributions: parseFloat(row.contributions),
+        totalContributions: parseFloat(row.totalContributions),
+        transactionCount: row.transactionCount,
+        lastContributionDate: row.lastContributionDate,
+        rankPosition: row.rankPosition,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        user: row.user_id ? {
+          id: row.user_id,
+          emails: row.user_emails,
+          walletAddress: row.user_walletAddress,
+          isActive: row.user_isActive,
+          lastLogin: row.user_lastLogin,
+          currentLinkedCollege: row.user_currentLinkedCollege
+        } : null
+      }));
+
+      return {
+        success: true,
+        data: transformedLeaderboard
+      };
+    } catch (error) {
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to get user leaderboard. Please try again.'
+      };
+    }
   }
 
-  async getCollegeLeaderboard(limit: number = 20): Promise<CollegeStats[]> {
-    return this.collegeStatsRepository.find({
-      relations: ['college'],
-      order: { totalContributionsReceived: 'DESC' },
-      take: limit,
-    });
+  async getCollegeLeaderboard(limit: number = 20): Promise<{success: boolean, data?: CollegeStats[], statusCode?: number, message?: string}> {
+    try {
+      const leaderboard = await this.collegeStatsRepository.find({
+        relations: ['college'],
+        order: { totalContributionsReceived: 'DESC' },
+        take: limit,
+      });
+
+      return {
+        success: true,
+        data: leaderboard
+      };
+    } catch (error) {
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to get college leaderboard. Please try again.'
+      };
+    }
   }
 
   async getTradingVolume(periodType: PeriodType, periodStart?: Date): Promise<TradingVolumeStats | null> {
-    const query = this.tradingVolumeStatsRepository.createQueryBuilder('stats')
-      .where('stats.periodType = :periodType', { periodType });
+    try {
+      const query = this.tradingVolumeStatsRepository.createQueryBuilder('stats')
+        .where('stats.periodType = :periodType', { periodType });
 
-    if (periodStart) {
-      query.andWhere('stats.periodStart = :periodStart', { periodStart });
-    } else {
-      query.orderBy('stats.periodStart', 'DESC').limit(1);
+      if (periodStart) {
+        query.andWhere('stats.periodStart = :periodStart', { periodStart });
+      } else {
+        query.orderBy('stats.periodStart', 'DESC').limit(1);
+      }
+
+      return query.getOne();
+    } catch (error) {
+      throw new HttpException(
+        'Failed to get trading volume. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-
-    return query.getOne();
   }
 
-  async getUserStats(id: number): Promise<UserStats> {
-    const userStats = await this.userStatsRepository.findOne({ where: { id } });
-    if (!userStats) {
-      throw new NotFoundException('User stats not found');
+  async getUserStatsByUserId(id: number): Promise<{success: boolean, data?: UserStats, statusCode?: number, message?: string}> {
+    try {
+      const userStats = await this.userStatsRepository.findOne({ where: { id } });
+      if (!userStats) {
+        return {
+          success: false,
+          statusCode: 404,
+          message: 'User stats not found'
+        };
+      }
+      return {
+        success: true,
+        data: userStats
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Failed to get user stats. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    return userStats;
   }
 
-  async getCollegeStats(id: number): Promise<CollegeStats> {
-    const collegeStats = await this.collegeStatsRepository.findOne({ where: { id } });
-    if (!collegeStats) {
-      throw new NotFoundException('College stats not found');
+  async getCollegeStatsByCollegeId(id: number): Promise<{success: boolean, data?: CollegeStats, statusCode?: number, message?: string}> {
+    try {
+      const collegeStats = await this.collegeStatsRepository.findOne({ where: { id } });
+      if (!collegeStats) {
+        return {
+          success: false,
+          statusCode: 404,
+          message: 'College stats not found'
+        };
+      }
+      return {
+        success: true,
+        data: collegeStats
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Failed to get college stats. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    return collegeStats;
   }
 
-  async getUserStatsByWalletAddress(walletAddress: string): Promise<UserStats | null> {
-    return this.userStatsRepository.findOne({
-      where: { walletAddress },
-      relations: ['user']
-    });
+  async getUserStatsByWalletAddress(walletAddress: string): Promise<{success: boolean, data?: UserStats[], statusCode?: number, message?: string}> {
+    try {
+      const userStats = await this.userStatsRepository.find({
+        where: { walletAddress },
+        relations: ['user'],
+        order: { totalContributions: 'DESC' }
+      });
+      if (!userStats || userStats.length === 0) {
+        return {
+          success: false,
+          statusCode: 404,
+          message: 'User stats not found'
+        };
+      }
+      return {
+        success: true,
+        data: userStats
+      };
+    } catch (error) {
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to get user stats by wallet address. Please try again.'
+      };
+    }
   }
 
-  async getCollegeStatsByWalletAddress(walletAddress: string): Promise<CollegeStats | null> {
-    return this.collegeStatsRepository.findOne({
-      where: { walletAddress },
-      relations: ['college']
-    });
+  async getCollegeStatsByWalletAddress(walletAddress: string): Promise<{success: boolean, data?: CollegeStats, statusCode?: number, message?: string}> {
+    try {
+      const collegeStats = await this.collegeStatsRepository.findOne({
+        where: { walletAddress },
+        relations: ['college']
+      });
+      if (!collegeStats) {
+        return {
+          success: false,
+          statusCode: 404,
+          message: 'College stats not found'
+        };
+      }
+      return {
+        success: true,
+        data: collegeStats
+      };
+    } catch (error) {
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to get college stats by wallet address. Please try again.'
+      };
+    }
   }
 
   async getRecentTradingVolume(days: number = 7): Promise<TradingVolumeStats[]> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    return this.tradingVolumeStatsRepository.find({
-      where: {
-        periodType: PeriodType.DAILY,
-        periodStart: MoreThanOrEqual(cutoffDate)
-      },
-      order: { periodStart: 'DESC' }
-    });
+      return this.tradingVolumeStatsRepository.find({
+        where: {
+          periodType: PeriodType.DAILY,
+          periodStart: MoreThanOrEqual(cutoffDate)
+        },
+        order: { periodStart: 'DESC' }
+      });
+    } catch (error) {
+      throw new HttpException(
+        'Failed to get recent trading volume. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
-  async linkUserStatsOnSignup(userId: number, walletAddress: string): Promise<void> {
+  async linkUserStatsOnSignup(userId: number, walletAddress: string): Promise<{success: boolean, statusCode?: number, message?: string}> {
     try {
       await this.userStatsRepository.query(`
         UPDATE user_stats 
         SET "userId" = $1, "updatedAt" = now()
         WHERE "walletAddress" = $2 AND "userId" IS NULL
       `, [userId, walletAddress]);
-  
-      this.logger.log(`Linked existing stats to user ${userId} for wallet ${walletAddress}`);
+
+      this.logger.log(`Linked existing stats to user ${userId} for wallet ${walletAddress} (all college rows)`);
+      return {
+        success: true,
+        message: 'User stats linked on signup for all college associations'
+      };
     } catch (error) {
       this.logger.error(`Error linking stats for user ${userId}:`, error);
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to link user stats on signup. Please try again.'
+      };
     }
   }
 }

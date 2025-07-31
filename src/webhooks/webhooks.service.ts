@@ -157,7 +157,8 @@ export class WebhooksService {
           null,
           fromAddress,
           amount,
-          transactionDate
+          transactionDate,
+          linkedSchoolWallet || undefined
         );
       }
 

@@ -1,7 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn, Unique } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 
 @Entity('user_stats')
+@Unique(['walletAddress', 'linkedCollege'])
 export class UserStats {
   @PrimaryGeneratedColumn()
   id: number;
@@ -13,8 +14,14 @@ export class UserStats {
   @JoinColumn({ name: 'userId' })
   user: User | null;
 
-  @Column({ type: 'varchar', length: 44, unique: true })
+  @Column({ type: 'varchar', length: 44 })
   walletAddress: string;
+
+  @Column({ type: 'varchar', length: 44 })
+  linkedCollege: string;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  contributions: number;
 
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   totalContributions: number;
