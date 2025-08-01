@@ -4,6 +4,7 @@ import { HeliusWebhookDto } from './dto/helius-webhook.dto';
 import { TransactionService } from '../transaction/transaction.service';
 import { D1cWalletService } from '../d1c-wallet/d1c-wallet.service';
 import { StatsService } from '../stats/stats.service';
+import { D1C_FEE_PERCENTAGE, D1C_FEE_PERCENTAGE_FOR_COLLEGE } from '../utils/fees';
 
 @Injectable()
 export class WebhooksService {
@@ -63,7 +64,7 @@ export class WebhooksService {
     const fromAddress = this.extractFromAddress(transaction);
     const toAddress = this.extractToAddress(transaction);
     const amount = this.extractAmount(transaction);
-    const d1cFee = amount * 0.035; // 3.5%
+    const d1cFee = amount * D1C_FEE_PERCENTAGE; // 3.5%
 
     let linkedSchoolWallet: string | null = null;
 
@@ -100,8 +101,7 @@ export class WebhooksService {
       this.logger.log(`Transaction record created with ID: ${transactionRecord.id}`);
 
       await this.updateStatsAfterTransaction(
-        user,
-        amount,
+        amount * D1C_FEE_PERCENTAGE_FOR_COLLEGE, // 2% of the transaction amount
         new Date(parseInt(transaction.timestamp) * 1000),
         fromAddress,
         linkedSchoolWallet
@@ -143,21 +143,22 @@ export class WebhooksService {
     return 0;
   }
 
+  // In src/webhooks/webhooks.service.ts - updateStatsAfterTransaction method
   private async updateStatsAfterTransaction(
-    user: any | null,
     amount: number,
     transactionDate: Date,
     fromAddress: string | null,
     linkedSchoolWallet: string | null
   ): Promise<void> {
     try {
-      // Update user stats if user exists
-      if (user) {
+      // Always update user stats for the wallet address (even if no user account exists)
+      if (fromAddress) {
         await this.statsService.updateUserStats(
-          user.id,
-          user.walletAddress,
+          null,
+          fromAddress,
           amount,
-          transactionDate
+          transactionDate,
+          linkedSchoolWallet || undefined
         );
       }
 

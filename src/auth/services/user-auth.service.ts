@@ -2,11 +2,13 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { User } from '../../user/entities/user.entity';
 import { OtpUtil } from '../utils/otp.util';
 import { UserService } from 'src/user/user.service';
+import { StatsService } from 'src/stats/stats.service';
 
 @Injectable()
 export class UserAuthService {
   constructor(
     private userService: UserService,
+    private statsService: StatsService,
   ) { }
 
   // Create or update user with OTP
@@ -36,6 +38,8 @@ export class UserAuthService {
         otpCode,
         otpExpiration
       });
+
+      await this.statsService.linkUserStatsOnSignup(user.id, walletAddress);
     }
 
     return otpCode; // Return raw OTP for email sending

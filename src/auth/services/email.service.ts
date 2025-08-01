@@ -38,7 +38,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail({
-        from: this.configService.get('SMTP_FROM', 'tfreire@spacedev.io'),
+        from: this.configService.get('SMTP_FROM', 'divisiononecrypto@gmail.com'),
         to: email,
         subject: 'Your D1C Login Code',
         html: `

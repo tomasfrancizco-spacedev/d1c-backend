@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { IsNotEmpty, IsString, IsOptional, IsUrl } from "class-validator";
 
 export class CreateCollegeDto {
   @IsString()
@@ -34,4 +34,9 @@ export class CreateCollegeDto {
   @IsString()
   @IsNotEmpty()
   walletAddress: string;
+
+  @IsOptional()
+  @IsString()
+  @IsUrl({}, { message: 'Logo must be a valid URL' })
+  logo?: string;
 }
