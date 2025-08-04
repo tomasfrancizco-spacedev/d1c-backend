@@ -36,8 +36,20 @@ export class UserController {
           walletAddress: { type: 'string', example: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM' },
           isActive: { type: 'boolean', example: true },
           lastLogin: { type: 'string', format: 'date-time', example: '2025-01-15T10:30:00.000Z', nullable: true },
-          currentLinkedCollege: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2', nullable: true },
-          linkedCollegeHistory: { type: 'array', items: { type: 'string' }, example: ['7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2'], nullable: true },
+          currentLinkedCollege: { 
+            type: 'object', 
+            nullable: true,
+            properties: {
+              id: { type: 'number', example: 1 },
+              name: { type: 'string', example: 'University of California, Los Angeles' },
+              commonName: { type: 'string', example: 'UCLA' },
+              nickname: { type: 'string', example: 'Bruins' },
+              city: { type: 'string', example: 'Los Angeles' },
+              state: { type: 'string', example: 'CA' },
+              walletAddress: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2' }
+            }
+          },
+
           otpCode: { type: 'string', example: null, nullable: true },
           otpExpiration: { type: 'string', format: 'date-time', example: null, nullable: true },
           createdAt: { type: 'string', format: 'date-time', example: '2025-01-01T00:00:00.000Z' },
@@ -74,8 +86,19 @@ export class UserController {
         walletAddress: { type: 'string', example: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM' },
         isActive: { type: 'boolean', example: true },
         lastLogin: { type: 'string', format: 'date-time', example: '2025-01-15T10:30:00.000Z', nullable: true },
-        currentLinkedCollege: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2', nullable: true },
-        linkedCollegeHistory: { type: 'array', items: { type: 'string' }, example: ['7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2'], nullable: true },
+        currentLinkedCollege: { 
+          type: 'object', 
+          nullable: true,
+          properties: {
+            id: { type: 'number', example: 1 },
+            name: { type: 'string', example: 'University of California, Los Angeles' },
+            commonName: { type: 'string', example: 'UCLA' },
+            nickname: { type: 'string', example: 'Bruins' },
+            city: { type: 'string', example: 'Los Angeles' },
+            state: { type: 'string', example: 'CA' },
+            walletAddress: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2' }
+          }
+        },
         otpCode: { type: 'string', example: null, nullable: true },
         otpExpiration: { type: 'string', format: 'date-time', example: null, nullable: true },
         createdAt: { type: 'string', format: 'date-time', example: '2025-01-01T00:00:00.000Z' },
@@ -89,6 +112,14 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   findOne(@Param('id') id: string) {
     return this.userService.viewUser(+id);
+  }
+
+  @Get('wallet/:address')
+  @ApiOperation({ summary: 'Get user by wallet address' })
+  @ApiParam({ name: 'address', required: true, description: 'Wallet address' })
+  @ApiResponse({ status: 200, description: 'User retrieved successfully' })
+  findOneByWalletAddress(@Param('address') address: string) {
+    return this.userService.findUserByWalletAddress(address);
   }
 
   @Patch(':id')
@@ -118,8 +149,19 @@ export class UserController {
         walletAddress: { type: 'string', example: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM' },
         isActive: { type: 'boolean', example: true },
         lastLogin: { type: 'string', format: 'date-time', example: '2025-01-15T10:30:00.000Z', nullable: true },
-        currentLinkedCollege: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2', nullable: true },
-        linkedCollegeHistory: { type: 'array', items: { type: 'string' }, example: ['7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2'], nullable: true },
+        currentLinkedCollege: { 
+          type: 'object', 
+          nullable: true,
+          properties: {
+            id: { type: 'number', example: 1 },
+            name: { type: 'string', example: 'University of California, Los Angeles' },
+            commonName: { type: 'string', example: 'UCLA' },
+            nickname: { type: 'string', example: 'Bruins' },
+            city: { type: 'string', example: 'Los Angeles' },
+            state: { type: 'string', example: 'CA' },
+            walletAddress: { type: 'string', example: '7xKUo8QzGhzB2vY1NdR9eF5tA3cW8pL6mS4jH9qK1rE2' }
+          }
+        },
         otpCode: { type: 'string', example: null, nullable: true },
         otpExpiration: { type: 'string', format: 'date-time', example: null, nullable: true },
         createdAt: { type: 'string', format: 'date-time', example: '2025-01-01T00:00:00.000Z' },

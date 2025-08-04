@@ -19,7 +19,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           database: configService.get('POSTGRES_DB'),
           entities: [`${__dirname}/../**/*.entity.*`],
           migrations: [`${__dirname}/migrations/*{.ts,.js}`],
-          synchronize: isLocalhost,
+          synchronize: false,
           migrationsRun: !isLocalhost,
           logging: configService.get('NODE_ENV') === 'development',
           ...(isLocalhost ? {} : {

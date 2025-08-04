@@ -7,8 +7,9 @@ import {
   Matches,
   IsOptional,
   IsDate,
+  IsNumber,
 } from 'class-validator';
-import { SOLANA_ADDRESS_REGEX } from 'src/utils/solanaAddressRegex';
+import { SOLANA_ADDRESS_REGEX } from '../../utils/solanaAddressRegex';
 import { Type } from 'class-transformer';
 
 export class CreateUserDto {
@@ -37,20 +38,10 @@ export class CreateUserDto {
   otpExpiration: Date | null;
 
   @IsOptional()
-  @IsString()
-  @Matches(SOLANA_ADDRESS_REGEX, {
-    message: 'Current linked college must be a valid Solana address (32-44 base58 characters)',
-  })
-  currentLinkedCollege: string | null;
+  @IsNumber()
+  currentLinkedCollegeId: number | null;
 
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @Matches(SOLANA_ADDRESS_REGEX, {
-    each: true,
-    message: 'Each linked college history entry must be a valid Solana address (32-44 base58 characters)',
-  })
-  linkedCollegeHistory: string[] | null;
+
 
   @IsOptional()
   @IsDate()

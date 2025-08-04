@@ -5,6 +5,7 @@ import { TransactionService } from '../transaction/transaction.service';
 import { D1cWalletService } from '../d1c-wallet/d1c-wallet.service';
 import { StatsService } from '../stats/stats.service';
 import { D1C_FEE_PERCENTAGE, D1C_FEE_PERCENTAGE_FOR_COLLEGE } from '../utils/fees';
+import { College } from '../college/entities/college.entity';
 
 @Injectable()
 export class WebhooksService {
@@ -66,14 +67,13 @@ export class WebhooksService {
     const amount = this.extractAmount(transaction);
     const d1cFee = amount * D1C_FEE_PERCENTAGE; // 3.5%
 
-    let linkedSchoolWallet: string | null = null;
+    let linkedCollege: College | null = null;
 
     if (user && user.currentLinkedCollege) {
       // User exists and has linked school
-      linkedSchoolWallet = user.currentLinkedCollege;
+      linkedCollege = user.currentLinkedCollege;
     } else {
-      // User doesn't exist or no linked school - use community wallet
-      linkedSchoolWallet = await this.getCommunityWallet();
+      linkedCollege = null;
     }
 
     console.log('Transaction data to save:', {
@@ -82,7 +82,7 @@ export class WebhooksService {
       timestamp: transaction.timestamp,
       amount: amount,
       d1cFee: d1cFee,
-      linkedSchoolWallet: linkedSchoolWallet,
+      linkedCollegeId: linkedCollege?.id || null,
       signature: transaction.signature
     });
 
@@ -94,17 +94,18 @@ export class WebhooksService {
         timestamp: new Date(parseInt(transaction.timestamp) * 1000),
         amount: amount,
         d1cFee: d1cFee,
-        linkedSchoolWallet: linkedSchoolWallet,
+        linkedCollegeId: linkedCollege?.id || null,
         signature: transaction.signature
       });
 
       this.logger.log(`Transaction record created with ID: ${transactionRecord.id}`);
 
       await this.updateStatsAfterTransaction(
-        amount * D1C_FEE_PERCENTAGE_FOR_COLLEGE, // 2% of the transaction amount
+        user?.id || null,
+        amount,
         new Date(parseInt(transaction.timestamp) * 1000),
         fromAddress,
-        linkedSchoolWallet
+        linkedCollege || null
       );
 
 
@@ -145,28 +146,31 @@ export class WebhooksService {
 
   // In src/webhooks/webhooks.service.ts - updateStatsAfterTransaction method
   private async updateStatsAfterTransaction(
+    userId: number | null,
     amount: number,
     transactionDate: Date,
     fromAddress: string | null,
-    linkedSchoolWallet: string | null
+    linkedCollege: College | null
   ): Promise<void> {
+
+    const collegeFeeAmount = amount * D1C_FEE_PERCENTAGE_FOR_COLLEGE;
     try {
       // Always update user stats for the wallet address (even if no user account exists)
       if (fromAddress) {
         await this.statsService.updateUserStats(
-          null,
+          userId,
           fromAddress,
-          amount,
+          collegeFeeAmount,
           transactionDate,
-          linkedSchoolWallet || undefined
+          linkedCollege
         );
       }
 
       // Update college stats if linked school wallet exists
-      if (linkedSchoolWallet) {
+      if (linkedCollege) {
         await this.statsService.updateCollegeStats(
-          linkedSchoolWallet,
-          amount,
+          linkedCollege.walletAddress,
+          collegeFeeAmount,
           transactionDate
         );
       }
@@ -176,7 +180,7 @@ export class WebhooksService {
         amount,
         transactionDate,
         fromAddress || undefined,
-        linkedSchoolWallet || undefined
+        linkedCollege?.walletAddress || undefined
       );
 
       this.logger.log(`Successfully updated all stats for transaction amount: ${amount}`);

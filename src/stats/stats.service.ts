@@ -5,6 +5,7 @@ import { UserStats } from './entities/user-stats.entity';
 import { CollegeStats } from './entities/college-stats.entity';
 import { TradingVolumeStats, PeriodType } from './entities/trading-volume-stats.entity';
 import { CollegeService } from '../college/college.service';
+import { College } from '../college/entities/college.entity';
 
 @Injectable()
 export class StatsService {
@@ -20,35 +21,50 @@ export class StatsService {
     private collegeService: CollegeService,
   ) { }
 
-  async updateUserStats(userId: number | null, walletAddress: string, amount: number, transactionDate: Date, linkedCollege?: string): Promise<void> {
+  async updateUserStats(
+    userId: number | null,
+    walletAddress: string,
+    amount: number,
+    transactionDate: Date,
+    linkedCollege?: College | null
+  ): Promise<void> {
     try {
-      // Use empty string for community college if no linkedCollege provided
-      const collegeWallet = linkedCollege || '';
-      
-      // Step 1: Upsert the current college row (update both contributions and totalContributions)
+      const collegeId = linkedCollege?.id ?? null;
+
+      // Step 1: Upsert the row for the current college (or community)
       await this.userStatsRepository.query(`
-        INSERT INTO user_stats ("userId", "walletAddress", "linkedCollege", "contributions", "totalContributions", "transactionCount", "lastContributionDate", "createdAt", "updatedAt")
-        VALUES ($1, $2, $3, $4, $4, 1, $5, now(), now())
-        ON CONFLICT ("walletAddress", "linkedCollege") 
+        INSERT INTO user_stats (
+          "userId", "walletAddress", "linkedCollegeId", "contributions",
+          "totalContributions", "transactionCount", "lastContributionDate", "createdAt", "updatedAt"
+        ) VALUES ($1, $2, $3, $4, $4, 1, $5, now(), now())
+        ON CONFLICT ON CONSTRAINT "UQ_user_stats_wallet_college_safe"
         DO UPDATE SET
           "contributions" = user_stats."contributions" + EXCLUDED."contributions",
           "totalContributions" = user_stats."totalContributions" + EXCLUDED."totalContributions",
           "transactionCount" = user_stats."transactionCount" + 1,
           "lastContributionDate" = GREATEST(user_stats."lastContributionDate", EXCLUDED."lastContributionDate"),
           "updatedAt" = now()
-      `, [userId, walletAddress, collegeWallet, amount, transactionDate]);
-
-      // Step 2: Update totalContributions for ALL other rows of the same user (different colleges)
+      `, [userId, walletAddress, collegeId, amount, transactionDate]);
+      
+      // Paso 2: Obtener el nuevo total acumulado para este wallet
+      const result = await this.userStatsRepository.query(`
+        SELECT SUM("contributions") as "total" FROM user_stats WHERE "walletAddress" = $1
+      `, [walletAddress]);
+      
+      const newTotal = result?.[0]?.total || 0;
+      
+      // Paso 3: Actualizar todas las filas del wallet con ese nuevo total
       await this.userStatsRepository.query(`
         UPDATE user_stats 
         SET 
-          "totalContributions" = "totalContributions" + $1,
+          "totalContributions" = $1,
           "updatedAt" = now()
-        WHERE "walletAddress" = $2 AND "linkedCollege" != $3
-      `, [amount, walletAddress, collegeWallet]);
+        WHERE 
+          "walletAddress" = $2
+      `, [newTotal, walletAddress]);
 
-      const collegeType = collegeWallet ? `linked college ${collegeWallet}` : 'community college';
-      this.logger.log(`Updated user stats for wallet ${walletAddress} (${collegeType}): +${amount} (college-specific and total across all colleges)`);
+      const collegeType = linkedCollege ? `linked college ${linkedCollege.name}` : 'community college';
+      this.logger.log(`Updated user stats for wallet ${walletAddress} (${collegeType}): +${amount}`);
     } catch (error) {
       this.logger.error(`Error updating user stats for wallet ${walletAddress}:`, error);
     }
@@ -153,7 +169,7 @@ export class StatsService {
           us.id,
           us."userId", 
           us."walletAddress",
-          us."linkedCollege",
+          us."linkedCollegeId",
           us."contributions",
           us."totalContributions",
           us."transactionCount",
@@ -166,9 +182,21 @@ export class StatsService {
           u."walletAddress" as "user_walletAddress",
           u."isActive" as "user_isActive",
           u."lastLogin" as "user_lastLogin",
-          u."currentLinkedCollege" as "user_currentLinkedCollege"
+          u."currentLinkedCollegeId" as "user_currentLinkedCollegeId",
+          c.id as "college_id",
+          c.name as "college_name",
+          c.nickname as "college_nickname",
+          c."commonName" as "college_commonName",
+          c.city as "college_city",
+          c.state as "college_state",
+          c.type as "college_type",
+          c.subdivision as "college_subdivision",
+          c.primary as "college_primary",
+          c."walletAddress" as "college_walletAddress",
+          c.logo as "college_logo"
         FROM user_stats_with_rank us
         LEFT JOIN "user" u ON us."userId" = u.id
+        LEFT JOIN "college" c ON us."linkedCollegeId" = c.id
         WHERE us.rn = 1
         ORDER BY us."totalContributions" DESC
       `, [limit]);
@@ -178,7 +206,19 @@ export class StatsService {
         id: row.id,
         userId: row.userId,
         walletAddress: row.walletAddress,
-        linkedCollege: row.linkedCollege,
+        linkedCollege: row.college_id ? {
+          id: row.college_id,
+          name: row.college_name,
+          nickname: row.college_nickname,
+          commonName: row.college_commonName,
+          city: row.college_city,
+          state: row.college_state,
+          type: row.college_type,
+          subdivision: row.college_subdivision,
+          primary: row.college_primary,
+          walletAddress: row.college_walletAddress,
+          logo: row.college_logo,
+        } : null,
         contributions: parseFloat(row.contributions),
         totalContributions: parseFloat(row.totalContributions),
         transactionCount: row.transactionCount,
@@ -192,7 +232,7 @@ export class StatsService {
           walletAddress: row.user_walletAddress,
           isActive: row.user_isActive,
           lastLogin: row.user_lastLogin,
-          currentLinkedCollege: row.user_currentLinkedCollege
+          currentLinkedCollegeId: row.user_currentLinkedCollegeId
         } : null
       }));
 
@@ -209,7 +249,7 @@ export class StatsService {
     }
   }
 
-  async getCollegeLeaderboard(limit: number = 20): Promise<{success: boolean, data?: CollegeStats[], statusCode?: number, message?: string}> {
+  async getCollegeLeaderboard(limit: number = 20): Promise<{ success: boolean, data?: CollegeStats[], statusCode?: number, message?: string }> {
     try {
       const leaderboard = await this.collegeStatsRepository.find({
         relations: ['college'],
@@ -250,9 +290,9 @@ export class StatsService {
     }
   }
 
-  async getUserStatsByUserId(id: number): Promise<{success: boolean, data?: UserStats, statusCode?: number, message?: string}> {
+  async getUserStatsByUserId(id: number): Promise<{ success: boolean, data?: UserStats[], statusCode?: number, message?: string }> {
     try {
-      const userStats = await this.userStatsRepository.findOne({ where: { id } });
+      const userStats = await this.userStatsRepository.find({ where: { userId: id }, relations: ['user', 'linkedCollege'] });
       if (!userStats) {
         return {
           success: false,
@@ -272,7 +312,7 @@ export class StatsService {
     }
   }
 
-  async getCollegeStatsByCollegeId(id: number): Promise<{success: boolean, data?: CollegeStats, statusCode?: number, message?: string}> {
+  async getCollegeStatsByCollegeId(id: number): Promise<{ success: boolean, data?: CollegeStats, statusCode?: number, message?: string }> {
     try {
       const collegeStats = await this.collegeStatsRepository.findOne({ where: { id } });
       if (!collegeStats) {
@@ -294,13 +334,14 @@ export class StatsService {
     }
   }
 
-  async getUserStatsByWalletAddress(walletAddress: string): Promise<{success: boolean, data?: UserStats[], statusCode?: number, message?: string}> {
+  async getUserStatsByWalletAddress(walletAddress: string): Promise<{ success: boolean, data?: UserStats[], statusCode?: number, message?: string }> {
     try {
       const userStats = await this.userStatsRepository.find({
         where: { walletAddress },
-        relations: ['user'],
+        relations: ['user', 'linkedCollege'],
         order: { totalContributions: 'DESC' }
       });
+
       if (!userStats || userStats.length === 0) {
         return {
           success: false,
@@ -321,7 +362,7 @@ export class StatsService {
     }
   }
 
-  async getCollegeStatsByWalletAddress(walletAddress: string): Promise<{success: boolean, data?: CollegeStats, statusCode?: number, message?: string}> {
+  async getCollegeStatsByWalletAddress(walletAddress: string): Promise<{ success: boolean, data?: CollegeStats, statusCode?: number, message?: string }> {
     try {
       const collegeStats = await this.collegeStatsRepository.findOne({
         where: { walletAddress },
@@ -367,7 +408,7 @@ export class StatsService {
     }
   }
 
-  async linkUserStatsOnSignup(userId: number, walletAddress: string): Promise<{success: boolean, statusCode?: number, message?: string}> {
+  async linkUserStatsOnSignup(userId: number, walletAddress: string): Promise<{ success: boolean, statusCode?: number, message?: string }> {
     try {
       await this.userStatsRepository.query(`
         UPDATE user_stats 

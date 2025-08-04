@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { College } from '../../college/entities/college.entity';
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('transaction')
 export class Transaction {
@@ -11,8 +12,8 @@ export class Transaction {
   @Column({ type: 'varchar', length: 44, nullable: true })
   to: string | null;
 
-  @Column({ type: 'timestamp' })
-  timestamp: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  timestamp: Date | null;
 
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   amount: number;
@@ -20,8 +21,9 @@ export class Transaction {
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   d1cFee: number;
 
-  @Column({ type: 'varchar', length: 44, nullable: true })
-  linkedSchoolWallet: string | null;
+  @ManyToOne(() => College, { nullable: true })
+  @JoinColumn({ name: 'linkedCollegeId' })
+  linkedCollege: College | null;
 
   @Column({ type: 'varchar', length: 88, unique: true })
   signature: string;

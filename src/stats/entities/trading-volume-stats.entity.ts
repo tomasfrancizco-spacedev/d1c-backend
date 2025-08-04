@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 
 export enum PeriodType {
   DAILY = 'daily',
@@ -8,6 +8,7 @@ export enum PeriodType {
   ALL_TIME = 'all_time'
 }
 
+@Unique('UQ_period_type_start', ['periodType', 'periodStart'])
 @Entity('trading_volume_stats')
 export class TradingVolumeStats {
   @PrimaryGeneratedColumn()
@@ -16,8 +17,8 @@ export class TradingVolumeStats {
   @Column({ type: 'varchar', length: 20 })
   periodType: PeriodType;
 
-  @Column({ type: 'timestamp' })
-  periodStart: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  periodStart: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })
   periodEnd: Date | null;

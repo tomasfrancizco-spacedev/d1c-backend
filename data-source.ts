@@ -16,7 +16,7 @@ export const AppDataSource = new DataSource({
   database: process.env.POSTGRES_DB,
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
-  synchronize: isLocalhost,
+  synchronize: false,
   migrationsRun: !isLocalhost,
   logging: process.env.NODE_ENV === 'development',
   ...(isLocalhost ? {} : {

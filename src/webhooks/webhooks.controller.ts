@@ -18,6 +18,7 @@ export class WebhooksController {
     try {
       console.log("webhookData", webhookData);
       console.log("tokenTransfers", webhookData[0].tokenTransfers);
+      console.log("authHeader", authHeader);
       if (authHeader !== this.configService.get('WEBHOOK_AUTH_TOKEN')) {
         this.logger.error(`Invalid auth header: ${authHeader}`);
         throw new UnauthorizedException('Invalid webhook authentication');
