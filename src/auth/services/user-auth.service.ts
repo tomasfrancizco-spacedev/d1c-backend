@@ -33,8 +33,7 @@ export class UserAuthService {
         emails: [email],
         lastLogin: null,
         isActive: false,
-        currentLinkedCollege: null,
-        linkedCollegeHistory: [],
+        currentLinkedCollegeId: null,
         otpCode,
         otpExpiration
       });

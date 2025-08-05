@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { College } from '../../college/entities/college.entity';
 
 @Entity()
 export class User {
@@ -17,11 +18,9 @@ export class User {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' , nullable: true })
   lastLogin: Date | null;
 
-  @Column({ type: 'varchar', length: 44, nullable: true })
-  currentLinkedCollege: string | null;
-
-  @Column({ type: 'varchar', array: true, nullable: true })
-  linkedCollegeHistory: string[] | null;
+  @ManyToOne(() => College, { nullable: true })
+  @JoinColumn({ name: 'currentLinkedCollegeId' })
+  currentLinkedCollege: College | null;
 
   @Column({ type: 'varchar', length: 6, nullable: true })
   otpCode: string | null;

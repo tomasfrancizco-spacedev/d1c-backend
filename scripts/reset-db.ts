@@ -1,23 +1,25 @@
+import { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 
-async function resetDatabase() {
+const resetDatabase = async () => {
+  const dataSource = new DataSource(AppDataSource.options);
+
   try {
-    // Initialize connection
-    await AppDataSource.initialize();
-    
-    console.log('🔄 Dropping all tables...');
-    
-    // Drop tables in correct order (due to foreign keys)
-    await AppDataSource.query('DROP TABLE IF EXISTS "user" CASCADE;');
-    // await AppDataSource.query('DROP TABLE IF EXISTS "college" CASCADE;');
-    
-    console.log('✅ Database tables dropped successfully');
-    
-    await AppDataSource.destroy();
+    await dataSource.initialize();
+    const queryRunner = dataSource.createQueryRunner();
+
+    console.log('🧨 Dropping all tables...');
+    await queryRunner.query(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+
+    console.log('📦 Running all migrations...');
+    await dataSource.runMigrations();
+
+    console.log('✅ Database reset and migrations run successfully');
+    await dataSource.destroy();
   } catch (error) {
     console.error('❌ Error resetting database:', error);
     process.exit(1);
   }
-}
+};
 
 resetDatabase();

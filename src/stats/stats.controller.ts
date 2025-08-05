@@ -43,6 +43,7 @@ export class StatsController {
   @ApiOperation({ summary: 'Get user stats by wallet address' })
   @ApiParam({ name: 'address', required: true, description: 'Wallet address' })
   @ApiResponse({ status: 200, description: 'User stats retrieved successfully' })
+  // /v1/stats/user-stats/wallet/0x1234567890123456789012345678901234567890
   async findAllUserStatsByWalletAddress(@Param('address') address: string) {
     return await this.statsService.getUserStatsByWalletAddress(address);
   }
