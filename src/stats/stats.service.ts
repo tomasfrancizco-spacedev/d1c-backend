@@ -270,26 +270,6 @@ export class StatsService {
     }
   }
 
-  async getTradingVolume(periodType: PeriodType, periodStart?: Date): Promise<TradingVolumeStats | null> {
-    try {
-      const query = this.tradingVolumeStatsRepository.createQueryBuilder('stats')
-        .where('stats.periodType = :periodType', { periodType });
-
-      if (periodStart) {
-        query.andWhere('stats.periodStart = :periodStart', { periodStart });
-      } else {
-        query.orderBy('stats.periodStart', 'DESC').limit(1);
-      }
-
-      return query.getOne();
-    } catch (error) {
-      throw new HttpException(
-        'Failed to get trading volume. Please try again.',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    }
-  }
-
   async getUserStatsByUserId(id: number): Promise<{ success: boolean, data?: UserStats[], statusCode?: number, message?: string }> {
     try {
       const userStats = await this.userStatsRepository.find({ where: { userId: id }, relations: ['user', 'linkedCollege'] });
@@ -335,7 +315,7 @@ export class StatsService {
   }
 
   async getUserStatsByWalletAddress(walletAddress: string): Promise<{ success: boolean, data?: UserStats[], statusCode?: number, message?: string }> {
-    try {
+    try {      
       const userStats = await this.userStatsRepository.find({
         where: { walletAddress },
         relations: ['user', 'linkedCollege'],
@@ -384,6 +364,30 @@ export class StatsService {
         success: false,
         statusCode: 500,
         message: 'Failed to get college stats by wallet address. Please try again.'
+      };
+    }
+  }
+
+  async getTradingVolume(periodType: PeriodType, periodStart?: Date): Promise<{ success: boolean, data?: TradingVolumeStats | null, statusCode?: number, message?: string }> {
+    try {
+      const query = this.tradingVolumeStatsRepository.createQueryBuilder('stats')
+        .where('stats.periodType = :periodType', { periodType });
+
+      if (periodStart) {
+        query.andWhere('stats.periodStart = :periodStart', { periodStart });
+      } else {
+        query.orderBy('stats.periodStart', 'DESC').limit(1);
+      }
+
+      return {
+        success: true,
+        data: await query.getOne() || null
+      };
+    } catch (error) {
+      return {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to get trading volume. Please try again.'
       };
     }
   }

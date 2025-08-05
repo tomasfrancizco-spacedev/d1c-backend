@@ -76,16 +76,6 @@ export class WebhooksService {
       linkedCollege = null;
     }
 
-    console.log('Transaction data to save:', {
-      from: fromAddress,
-      to: toAddress,
-      timestamp: transaction.timestamp,
-      amount: amount,
-      d1cFee: d1cFee,
-      linkedCollegeId: linkedCollege?.id || null,
-      signature: transaction.signature
-    });
-
     // Save to TRANSACTIONS table
     try {
       const transactionRecord = await this.transactionService.create({

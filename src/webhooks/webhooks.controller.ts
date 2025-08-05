@@ -16,9 +16,6 @@ export class WebhooksController {
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   async handleHeliusWebhook(@Body() webhookData: HeliusWebhookDto[], @Headers('authorization') authHeader?: string, @Headers('user-agent') userAgent?: string) {
     try {
-      console.log("webhookData", webhookData);
-      console.log("tokenTransfers", webhookData[0].tokenTransfers);
-      console.log("authHeader", authHeader);
       if (authHeader !== this.configService.get('WEBHOOK_AUTH_TOKEN')) {
         this.logger.error(`Invalid auth header: ${authHeader}`);
         throw new UnauthorizedException('Invalid webhook authentication');
@@ -29,7 +26,6 @@ export class WebhooksController {
       }
 
       this.logger.log(`Received ${webhookData.length} transaction(s) from Helius`);
-      console.log("webhookData", webhookData);
 
       // Process each transaction
       for (const transaction of webhookData) {

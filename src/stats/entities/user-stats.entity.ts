@@ -21,6 +21,10 @@ export class UserStats {
   @Column({ type: 'bigint', nullable: true })
   linkedCollegeId: number | null;
 
+  @ManyToOne(() => College, { nullable: true })
+  @JoinColumn({ name: 'linkedCollegeId' })
+  linkedCollege: College | null;
+
   @Column({ type: 'bigint', insert: false, update: false, select: false })
   linkedCollegeIdSafe: number;
 
