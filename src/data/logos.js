@@ -7,7 +7,7 @@ for(let i=0;i<collegeName.length;i++){
   list.push(`${collegeName[i].innerText}: ${collegeLogo[i].src}`)
 }
 
-[
+const logos = [
     "A&M-Commerce Lions: https://content.sportslogos.net/logos/30/6863/thumbs/686367402013.gif",
     "Abilene Christian Wildcats: https://content.sportslogos.net/logos/30/5071/thumbs/507177262013.gif",
     "AIC Yellow Jackets: https://content.sportslogos.net/logos/30/5069/thumbs/506988952009.gif",
@@ -84,10 +84,7 @@ for(let i=0;i<collegeName.length;i++){
     "Creighton Bluejays: https://content.sportslogos.net/logos/30/652/thumbs/65227962013.gif",
     "CSU Buccaneers: https://content.sportslogos.net/logos/30/638/thumbs/63826592021.gif",
     "CSU Bakersfield Roadrunners: https://content.sportslogos.net/logos/30/5046/thumbs/504629892019.gif",
-    "Sacramento State Hornets: https://content.sportslogos.net/logos/30/629/thumbs/okyaz26kurakymvf0hh42hijj.gif"
-]
-
-[
+    "Sacramento State Hornets: https://content.sportslogos.net/logos/30/629/thumbs/okyaz26kurakymvf0hh42hijj.gif",
     "Dartmouth Big Green: https://content.sportslogos.net/logos/31/653/thumbs/65382902019.gif",
     "Davidson Wildcats: https://content.sportslogos.net/logos/31/654/thumbs/65429612023.gif",
     "Dayton Flyers: https://content.sportslogos.net/logos/31/655/thumbs/65570832015.gif",
@@ -140,10 +137,7 @@ for(let i=0;i<collegeName.length;i++){
     "Holy Cross Crusaders: https://content.sportslogos.net/logos/31/699/thumbs/69944842018.gif",
     "Houston Cougars: https://content.sportslogos.net/logos/31/700/thumbs/70018072017.gif",
     "Houston Christian Huskies: https://content.sportslogos.net/logos/31/6867/thumbs/686715972023.gif",
-    "Howard Bison: https://content.sportslogos.net/logos/31/701/thumbs/70140892015.gif"
-]
-
-[
+    "Howard Bison: https://content.sportslogos.net/logos/31/701/thumbs/70140892015.gif",
     "Idaho Vandals: https://content.sportslogos.net/logos/32/704/thumbs/70424842018.gif",
     "Idaho State Bengals: https://content.sportslogos.net/logos/32/705/thumbs/70529292019.gif",
     "Illinois Fighting Illini: https://content.sportslogos.net/logos/32/706/thumbs/70667022022.gif",
@@ -220,10 +214,7 @@ for(let i=0;i<collegeName.length;i++){
     "Morgan State Bears: https://content.sportslogos.net/logos/32/762/thumbs/76275832002.gif",
     "Mount St. Marys Mountaineers: https://content.sportslogos.net/logos/32/763/thumbs/76311752016.gif",
     "Murray State Racers: https://content.sportslogos.net/logos/32/764/thumbs/76425102014.gif",
-    "MVSU Delta Devils: https://content.sportslogos.net/logos/32/756/thumbs/6924.gif"
-]
-
-[
+    "MVSU Delta Devils: https://content.sportslogos.net/logos/32/756/thumbs/6924.gif",
     "Navy Midshipmen: https://content.sportslogos.net/logos/33/765/thumbs/76534162014.gif",
     "NC-Greensboro Spartans: https://content.sportslogos.net/logos/33/779/thumbs/nc-greensboro_spartans_logo_primary_2018sportslogosnet1876.gif",
     "NC-Wilmington Seahawks: https://content.sportslogos.net/logos/33/780/thumbs/78039712015.gif",
@@ -289,10 +280,7 @@ for(let i=0;i<collegeName.length;i++){
     "RIT Tigers: https://content.sportslogos.net/logos/33/5073/thumbs/507327972003.gif",
     "Robert Morris Colonials: https://content.sportslogos.net/logos/33/816/thumbs/81640582020.gif",
     "RPI Engineers: https://content.sportslogos.net/logos/33/5614/thumbs/561460082006.gif",
-    "Rutgers Scarlet Knights: https://content.sportslogos.net/logos/33/817/thumbs/81738102016.gif"
-]
-
-[
+    "Rutgers Scarlet Knights: https://content.sportslogos.net/logos/33/817/thumbs/81738102016.gif",
     "Sacred Heart Pioneers: https://content.sportslogos.net/logos/34/820/thumbs/82094932014.gif",
     "Saint Francis Red Flash: https://content.sportslogos.net/logos/34/821/thumbs/82175172018.gif",
     "Saint Louis Billikens: https://content.sportslogos.net/logos/34/822/thumbs/82293832022.gif",
@@ -357,10 +345,7 @@ for(let i=0;i<collegeName.length;i++){
     "Towson Tigers: https://content.sportslogos.net/logos/34/875/thumbs/87538812011.gif",
     "Troy Trojans: https://content.sportslogos.net/logos/34/876/thumbs/87610792016.gif",
     "Tulane Green Wave: https://content.sportslogos.net/logos/34/877/thumbs/87794352017.gif",
-    "Tulsa Golden Hurricane: https://content.sportslogos.net/logos/34/878/thumbs/87844742021.gif"
-]
-
-[
+    "Tulsa Golden Hurricane: https://content.sportslogos.net/logos/34/878/thumbs/87844742021.gif",
     "UAB Blazers: https://content.sportslogos.net/logos/35/879/thumbs/uab_blazers_logo_primary_2025sportslogosnet9598.gif",
     "UC San Diego Tritons: https://content.sportslogos.net/logos/35/6819/thumbs/681961752018.gif",
     "UCLA Bruins: https://content.sportslogos.net/logos/35/882/thumbs/88285272017.gif",
