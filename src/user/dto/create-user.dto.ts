@@ -23,7 +23,7 @@ export class CreateUserDto {
   @IsNotEmpty()
   @IsArray()
   @IsEmail(undefined, { each: true, message: 'Each email must be a valid email' })
-  emails: string[];
+  emails: string[] | null;
 
   @IsBoolean()
   isActive: boolean;
@@ -40,8 +40,6 @@ export class CreateUserDto {
   @IsOptional()
   @IsNumber()
   currentLinkedCollegeId: number | null;
-
-
 
   @IsOptional()
   @IsDate()

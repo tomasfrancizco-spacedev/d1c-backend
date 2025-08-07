@@ -29,7 +29,8 @@
     "pm2:stop:app": "pm2 stop app.json",
     "pm2:destroy:app": "pm2 delete app.json",
     "pm2:restart:app": "pm2 restart app.json",
-    "db:reset": "ts-node scripts/reset-db.ts"
+    "db:reset": "ts-node scripts/reset-db.ts",
+    "seed:colleges": "ts-node scripts/seed-colleges.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",

@@ -1,10 +1,13 @@
 import {
   Controller,
   Get,
+  Post,
   Body,
   Patch,
   Param,
   Delete,
+  BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -59,8 +62,10 @@ export class UserController {
     }
   })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  findAll() {
-    return this.userService.findAllUser();
+  findAll(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    const limitNum = limit ? parseInt(limit) : 20;
+    const offsetNum = offset ? parseInt(offset) : 0;
+    return this.userService.findAllUser(limitNum, offsetNum);
   }
 
   @Get(':id')
@@ -122,7 +127,7 @@ export class UserController {
     return this.userService.findUserByWalletAddress(address);
   }
 
-  @Patch(':id')
+  @Patch('/update/:id')
   @ApiOperation({ 
     summary: 'Update user',
     description: 'Updates user information. Only provided fields will be updated. Returns null if user not found.'
@@ -174,10 +179,11 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Invalid input data or user ID format' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    console.log(updateUserDto);
     return this.userService.updateUser(+id, updateUserDto);
   }
 
-  @Delete(':id')
+  @Delete('/delete/:id')
   @ApiOperation({ 
     summary: 'Delete user',
     description: 'Permanently deletes a user from the system. Returns TypeORM DeleteResult with affected count.'

@@ -48,7 +48,7 @@ export class StatsController {
     return await this.statsService.getUserStatsByWalletAddress(address);
   }
 
-  @Get('college-stats/:id')
+  @Get('college-stats/college-id/:id')
   @ApiOperation({ summary: 'Get college stats by college ID' })
   @ApiParam({ name: 'id', required: true, description: 'College ID' })
   @ApiResponse({ status: 200, description: 'College stats retrieved successfully' })
