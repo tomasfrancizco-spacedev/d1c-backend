@@ -16,12 +16,12 @@ export class UserService {
   async createUser(createUserDto: CreateUserDto): Promise<User> {
     try {
       let currentLinkedCollege: College | null = null;
-      
+
       if (createUserDto.currentLinkedCollegeId) {
         currentLinkedCollege = await this.collegeRepository.findOne({
           where: { id: createUserDto.currentLinkedCollegeId }
         });
-        
+
         if (!currentLinkedCollege) {
           throw new HttpException(
             'College not found',
@@ -49,16 +49,29 @@ export class UserService {
     }
   }
 
-  async findAllUser(): Promise<User[]> {
+  async findAllUser(limit: number, offset: number): Promise<{ success: boolean, data: User[], total: number, limit: number, offset: number }> {
     try {
-      const users = await this.userRepository.find({ relations: ['currentLinkedCollege'] });
-      return users;
+      const [users, total] = await this.userRepository.findAndCount({
+        relations: ['currentLinkedCollege'],
+        skip: offset,
+        take: limit,
+      });
+      return {
+        success: true,
+        data: users,
+        total: total,
+        limit: limit,
+        offset: offset,
+      };
     } catch (error) {
-      throw new HttpException(
-        'Failed to find all users. Please try again.',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    } 
+      return {
+        success: false,
+        data: error.message,
+        total: 0,
+        limit: limit,
+        offset: offset,
+      };
+    }
   }
 
   async viewUser(id: number): Promise<User | null> {
@@ -95,11 +108,11 @@ export class UserService {
   }
 
   async findUserByWalletAddress(walletAddress: string): Promise<User | null> {
-    try{
-      const user = await this.userRepository.findOne({ 
+    try {
+      const user = await this.userRepository.findOne({
         where: { walletAddress },
         relations: ['currentLinkedCollege']
-      }); 
+      });
       if (!user) {
         return null;
       }
@@ -146,6 +159,7 @@ export class UserService {
       }
       return null;
     } catch (error) {
+      console.error('Update failed:', error);
       throw new HttpException(
         'Failed to update user. Please try again.',
         HttpStatus.INTERNAL_SERVER_ERROR

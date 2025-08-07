@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateCollegeDto } from './dto/create-college.dto';
 import { UpdateCollegeDto } from './dto/update-college.dto';
@@ -25,8 +25,29 @@ export class CollegeService {
     } as DeepPartial<College>);
   }
 
-  async findAll(): Promise<College[]> {
-    return await this.collegeRepository.find();
+  async findAll(limit: number, offset: number): Promise<{success: boolean, data: College[], total: number, limit: number, offset: number}> {
+    try{
+      const [colleges, total] = await this.collegeRepository.findAndCount({
+        skip: offset,
+        take: limit,
+      });
+      return {
+        success: true,
+        data: colleges,
+        total: total,
+        limit: limit,
+        offset: offset,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: error.message,
+        total: 0,
+        limit: limit,
+        offset: offset,
+      };
+    }
+    
   }
 
   async findOne(id: number): Promise<College | null> {
