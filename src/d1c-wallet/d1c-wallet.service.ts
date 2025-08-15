@@ -38,4 +38,19 @@ export class D1cWalletService {
     const communityWallet = await this.findByType(WalletType.COMMUNITY);
     return communityWallet?.walletAddress || null;
   }
+
+  async getOpsWallet(): Promise<string | null> {
+    const opsWallet = await this.findByType(WalletType.OPS);
+    return opsWallet?.walletAddress || null;
+  }
+
+  async getFeeExemptWalletAddresses(): Promise<string[]> {
+    const rows = await this.d1cWalletRepository.find({ where: { fee_exempt: true } });
+    return rows.map(r => r.walletAddress);
+  }
+
+  async getIsWalletFeeExempt(walletAddress: string): Promise<boolean> {
+    const wallet = await this.findByAddress(walletAddress);
+    return wallet?.fee_exempt || false;
+  }
 } 

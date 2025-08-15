@@ -28,6 +28,12 @@ export class Transaction {
   @Column({ type: 'varchar', length: 88, unique: true })
   signature: string;
 
+  @Column({ type: 'boolean', default: false })
+  fee_harvested: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  fee_distributed: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
