@@ -15,7 +15,10 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isActive: boolean;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' , nullable: true })
+  @Column({ type: 'boolean', default: false })
+  isAdmin: boolean;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', nullable: true })
   lastLogin: Date | null;
 
   @ManyToOne(() => College, { nullable: true })

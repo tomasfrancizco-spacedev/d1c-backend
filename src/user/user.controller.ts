@@ -1,27 +1,26 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
   Delete,
-  BadRequestException,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
-/**
- * http://localhost:3000/user
- */
 @ApiTags('Users')
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get all users',
     description: 'Retrieves a list of all registered users in the system.'
@@ -69,6 +68,8 @@ export class UserController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get user by ID',
     description: 'Retrieves detailed information for a specific user by their user ID.'
@@ -120,6 +121,8 @@ export class UserController {
   }
 
   @Get('wallet/:address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user by wallet address' })
   @ApiParam({ name: 'address', required: true, description: 'Wallet address' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
@@ -128,6 +131,8 @@ export class UserController {
   }
 
   @Patch('/update/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Update user',
     description: 'Updates user information. Only provided fields will be updated. Returns null if user not found.'
@@ -179,7 +184,6 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Invalid input data or user ID format' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    console.log(updateUserDto);
     return this.userService.updateUser(+id, updateUserDto);
   }
 

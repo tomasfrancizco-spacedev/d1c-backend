@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { StatsModule } from './stats/stats.module';
 import { FeeManagementModule } from './fee-management/fee-management.module';
+import { D1cWalletModule } from './d1c-wallet/d1c-wallet.module';
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { FeeManagementModule } from './fee-management/fee-management.module';
     AuthModule,
     WebhooksModule,
     StatsModule,
-    FeeManagementModule
+    FeeManagementModule,
+    D1cWalletModule
   ],
   controllers: [AppController],
   providers: [AppService],

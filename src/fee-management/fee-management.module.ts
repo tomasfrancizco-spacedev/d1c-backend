@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { FeeHarvesterService } from './services/fee-harvester.service';
@@ -9,6 +9,8 @@ import { BurnTracker } from './entities/burn-tracker.entity';
 import { D1cWalletModule } from '../d1c-wallet/d1c-wallet.module';
 import { TransactionModule } from '../transaction/transaction.module';
 import { CollegeModule } from '../college/college.module';
+import { AuthModule } from 'src/auth/auth.module';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { CollegeModule } from '../college/college.module';
     D1cWalletModule,
     TransactionModule,
     CollegeModule,
+    AuthModule,
+    forwardRef(() => UserModule),
   ],
   providers: [FeeHarvesterService, FeeDistributorService],
   controllers: [FeeManagementController],
