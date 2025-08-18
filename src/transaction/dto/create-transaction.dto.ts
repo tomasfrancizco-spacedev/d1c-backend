@@ -1,4 +1,3 @@
-
 export interface CreateTransactionDto {
   from: string | null;
   to: string | null;
@@ -7,4 +6,6 @@ export interface CreateTransactionDto {
   d1cFee: number;
   linkedCollegeId: number | null;
   signature: string;
+  fee_harvested?: boolean;
+  fee_distributed?: boolean;
 } 

@@ -21,12 +21,21 @@ export class Transaction {
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   d1cFee: number;
 
+  @Column({ type: 'int', nullable: true })
+  linkedCollegeId: number | null;
+
   @ManyToOne(() => College, { nullable: true })
   @JoinColumn({ name: 'linkedCollegeId' })
   linkedCollege: College | null;
 
   @Column({ type: 'varchar', length: 88, unique: true })
   signature: string;
+
+  @Column({ type: 'boolean', default: false })
+  fee_harvested: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  fee_distributed: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

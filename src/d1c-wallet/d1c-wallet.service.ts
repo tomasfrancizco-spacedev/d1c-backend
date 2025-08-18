@@ -38,4 +38,11 @@ export class D1cWalletService {
     const communityWallet = await this.findByType(WalletType.COMMUNITY);
     return communityWallet?.walletAddress || null;
   }
+
+  async getOpsWallet(): Promise<string | null> {
+    const opsWallet = await this.findByType(WalletType.OPS);
+    return opsWallet?.walletAddress || null;
+  }
+
+
 } 

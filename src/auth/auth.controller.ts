@@ -105,37 +105,13 @@ export class AuthController {
           email: dto.email,
           walletAddress: user.walletAddress,
           isActive: user.isActive,
-          lastLogin: user.lastLogin
+          lastLogin: user.lastLogin,
+          isAdmin: user.isAdmin
         }
       };
     } catch (error) {
       console.error('❌ Error in verify OTP:', error);
       throw error;
     }
-  }
-
-  // Protected route example
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user profile (protected route example)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User profile retrieved',
-    schema: {
-      example: {
-        id: 1,
-        email: 'user@example.com',
-        walletAddress: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM'
-      }
-    }
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentUser() user: any) {
-    return {
-      id: user.sub,
-      email: user.email,
-      walletAddress: user.walletAddress
-    };
   }
 } 

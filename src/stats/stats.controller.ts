@@ -3,16 +3,21 @@ import {
   Get,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { StatsService } from './stats.service';
 import { PeriodType } from './entities/trading-volume-stats.entity';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { AdminGuard } from 'src/auth/guards/admin.guard';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('stats')
 export class StatsController {
   constructor(private readonly statsService: StatsService) { }
 
   @Get('user-leaderboard')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user leaderboard by total contributions' })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of users to return (default: 20)' })
   @ApiResponse({ status: 200, description: 'User leaderboard retrieved successfully' })
@@ -32,6 +37,8 @@ export class StatsController {
   }
 
   @Get('user-stats/user-id/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user stats by user ID' })
   @ApiParam({ name: 'id', required: true, description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User stats retrieved successfully' })
@@ -40,6 +47,8 @@ export class StatsController {
   }
 
   @Get('user-stats/wallet/:address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user stats by wallet address' })
   @ApiParam({ name: 'address', required: true, description: 'Wallet address' })
   @ApiResponse({ status: 200, description: 'User stats retrieved successfully' })
@@ -49,6 +58,8 @@ export class StatsController {
   }
 
   @Get('college-stats/college-id/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get college stats by college ID' })
   @ApiParam({ name: 'id', required: true, description: 'College ID' })
   @ApiResponse({ status: 200, description: 'College stats retrieved successfully' })
@@ -57,6 +68,8 @@ export class StatsController {
   }
 
   @Get('college-stats/wallet/:address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get college stats by wallet address' })
   @ApiParam({ name: 'address', required: true, description: 'Wallet address' })
   @ApiResponse({ status: 200, description: 'College stats retrieved successfully' })
@@ -65,6 +78,8 @@ export class StatsController {
   }
 
   @Get('trading-volume')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get trading volume by period type and start date' })
   @ApiQuery({ name: 'periodType', required: true, description: 'Period type (daily, weekly, monthly)' })
   @ApiQuery({ name: 'periodStart', required: false, description: 'Start date (YYYY-MM-DD)' })
@@ -78,6 +93,8 @@ export class StatsController {
   }
 
   @Get('trading-volume/recent')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get recent trading volume by number of days' })
   @ApiQuery({ name: 'days', required: false, description: 'Number of days to return (default: 7)' })
   @ApiResponse({ status: 200, description: 'Recent trading volume retrieved successfully' })
