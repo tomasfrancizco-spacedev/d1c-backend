@@ -6,8 +6,8 @@ import { Connection, PublicKey, Keypair, Transaction as SolanaTransaction, sendA
 import {
   TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
-  createTransferCheckedInstruction,
   createBurnInstruction,
+  createMintToInstruction,
   getAssociatedTokenAddress,
   getAccount,
   getMint,
@@ -43,6 +43,7 @@ export class FeeDistributorService {
   private readonly connection: Connection;
   private readonly mintPublicKey: PublicKey;
   private readonly opsWalletKeypair: Keypair;
+  private readonly mintAuthorityKeypair: Keypair;
   private readonly opsWalletAddress: string;
 
   constructor(
@@ -70,6 +71,14 @@ export class FeeDistributorService {
       new Uint8Array(JSON.parse(opsWalletSecret))
     );
     this.opsWalletAddress = this.opsWalletKeypair.publicKey.toString();
+
+    const mintAuthoritySecret = this.configService.get<string>('MINT_AUTHORITY_SECRET_KEY');
+    if (!mintAuthoritySecret) {
+      throw new Error('MINT_AUTHORITY_SECRET_KEY not configured');
+    }
+    this.mintAuthorityKeypair = Keypair.fromSecretKey(
+      new Uint8Array(JSON.parse(mintAuthoritySecret))
+    );
   }
 
   private mintDecimals: number | null = null;
@@ -98,12 +107,11 @@ export class FeeDistributorService {
         TOKEN_2022_PROGRAM_ID
       );
 
-      // Get all harvested transactions that haven't been distributed yet, excluding OPS wallet transactions
+      // Get all harvested transactions that haven't been distributed yet
       const harvestedNotDistributedTransactions = await this.transactionRepository.find({
         where: {
           fee_harvested: true,
           fee_distributed: false,
-          from: Not(this.opsWalletAddress)  // Exclude transactions sent by OPS wallet
         },
         relations: ['linkedCollege'],
         order: { timestamp: 'ASC' },
@@ -120,19 +128,21 @@ export class FeeDistributorService {
       // Group transactions by fee distribution requirements
       const distributions = await this.calculateDistributions(harvestedNotDistributedTransactions);
 
-      // Execute distributions from OPS wallet
-      for (const distribution of distributions) {
-        try {
-          const signatures = await this.executeDistribution(opsTokenAccount.toString(), distribution);
-          result.signatures.push(...signatures);
+      // Execute all distributions in optimized batches
+      try {
+        const signatures = await this.executeDistributionsBatched(opsTokenAccount.toString(), distributions);
+        result.signatures.push(...signatures);
+
+        // Calculate totals
+        for (const distribution of distributions) {
           result.collegeAmount += distribution.collegeAmount;
           result.burnedAmount += distribution.burnAmount;
-        } catch (error) {
-          const errorMsg = `Failed to execute distribution: ${error.message}`;
-          this.logger.error(errorMsg);
-          result.success = false;
-          result.errors.push(errorMsg);
         }
+      } catch (error) {
+        const errorMsg = `Failed to execute batched distributions: ${error.message}`;
+        this.logger.error(errorMsg);
+        result.success = false;
+        result.errors.push(errorMsg);
       }
 
       // Mark transactions as distributed after successful distribution
@@ -168,7 +178,6 @@ export class FeeDistributorService {
     if (!communityWallet) {
       throw new Error('Community wallet not configured');
     }
-    console.log({ transactions });
 
     for (const transaction of transactions) {
       const totalFee = transaction.amount;
@@ -204,7 +213,7 @@ export class FeeDistributorService {
   }
 
   /**
-   * Execute a single fee distribution (college/community + burn only)
+   * Execute a single fee distribution (mint/burn approach for supply neutrality)
    */
   private async executeDistribution(
     sourceTokenAccount: string,
@@ -219,27 +228,38 @@ export class FeeDistributorService {
         shouldBurn = await this.canBurnFullAmountThisPeriod(distribution.burnAmount);
       }
 
-      // If burning is disallowed this period, add the entire burn amount to the college transfer
-      const collegeTransferAmount = distribution.collegeAmount + (shouldBurn ? 0 : distribution.burnAmount);
-      if (collegeTransferAmount > 0) {
-        const collegeSignature = await this.transferTokens(
-          sourceTokenAccount,
+      // Calculate amounts to mint (college + potential extra burn if cap exceeded)
+      const collegeMintAmount = distribution.collegeAmount + (shouldBurn ? 0 : distribution.burnAmount);
+
+      // Mint tokens to college wallet (supply neutral mint)
+      if (collegeMintAmount > 0) {
+        const mintSignature = await this.mintTokensToCollege(
           distribution.collegeWallet,
-          collegeTransferAmount
+          collegeMintAmount
         );
-        signatures.push(collegeSignature);
-        this.logger.log(`Transferred ${collegeTransferAmount} tokens to college/community wallet: ${collegeSignature}`);
+        signatures.push(mintSignature);
+        this.logger.log(`Minted ${collegeMintAmount} tokens to college/community wallet: ${mintSignature}`);
       }
 
-      // Burn entire amount if allowed and update tracker
-      if (shouldBurn) {
-        const burnSignature = await this.burnTokens(
+      // Burn college amount from OPS to maintain supply neutrality
+      if (distribution.collegeAmount > 0) {
+        const collegeBurnSignature = await this.burnTokens(
+          sourceTokenAccount,
+          distribution.collegeAmount
+        );
+        signatures.push(collegeBurnSignature);
+        this.logger.log(`Burned ${distribution.collegeAmount} tokens from OPS (supply neutral): ${collegeBurnSignature}`);
+      }
+
+      // Burn deflationary amount if allowed and update tracker
+      if (shouldBurn && distribution.burnAmount > 0) {
+        const deflationaryBurnSignature = await this.burnTokens(
           sourceTokenAccount,
           distribution.burnAmount
         );
-        signatures.push(burnSignature);
+        signatures.push(deflationaryBurnSignature);
         await this.incrementPeriodBurn(distribution.burnAmount);
-        this.logger.log(`Burned ${distribution.burnAmount} tokens: ${burnSignature}`);
+        this.logger.log(`Burned ${distribution.burnAmount} tokens (deflationary): ${deflationaryBurnSignature}`);
       }
 
     } catch (error) {
@@ -251,15 +271,89 @@ export class FeeDistributorService {
   }
 
   /**
-   * Transfer tokens to a destination wallet
+ * Execute all distributions using optimized batching (MUCH faster)
+ */
+  private async executeDistributionsBatched(
+    sourceTokenAccount: string,
+    distributions: FeeDistribution[]
+  ): Promise<string[]> {
+    const signatures: string[] = [];
+
+    if (distributions.length === 0) {
+      return signatures;
+    }
+
+    try {
+      // Step 1: Calculate totals and determine burn eligibility
+      let totalDeflationaryBurn = 0;
+      const mintOperations: Array<{ wallet: string; amount: number }> = [];
+
+      for (const distribution of distributions) {
+        totalDeflationaryBurn += distribution.burnAmount;
+      }
+
+      const shouldBurn = totalDeflationaryBurn > 0 ?
+        await this.canBurnFullAmountThisPeriod(totalDeflationaryBurn) : false;
+
+      // Step 2: Prepare mint operations
+      for (const distribution of distributions) {
+        const collegeMintAmount = distribution.collegeAmount + (shouldBurn ? 0 : distribution.burnAmount);
+        if (collegeMintAmount > 0) {
+          mintOperations.push({
+            wallet: distribution.collegeWallet,
+            amount: collegeMintAmount
+          });
+        }
+      }
+
+      // Step 3: Execute ALL mints in parallel (HUGE performance gain!)
+      if (mintOperations.length > 0) {
+        this.logger.log(`Starting parallel mint to ${mintOperations.length} college wallets...`);
+
+        const mintPromises = mintOperations.map(op =>
+          this.mintTokensToCollege(op.wallet, op.amount)
+        );
+
+        const mintSignatures = await Promise.all(mintPromises);
+        signatures.push(...mintSignatures);
+
+        const totalMinted = mintOperations.reduce((sum, op) => sum + op.amount, 0);
+        this.logger.log(`✅ Parallel minting completed! Minted ${totalMinted} tokens to ${mintOperations.length} wallets`);
+      }
+
+      // Step 4: Execute batched burns (single transaction)
+      const totalCollegeBurn = distributions.reduce((sum, d) => sum + d.collegeAmount, 0);
+      const totalBurnAmount = totalCollegeBurn + (shouldBurn ? totalDeflationaryBurn : 0);
+
+      if (totalBurnAmount > 0) {
+        this.logger.log(`Burning total ${totalBurnAmount} tokens from OPS`);
+
+        const burnSignature = await this.burnTokens(sourceTokenAccount, totalBurnAmount);
+        signatures.push(burnSignature);
+
+        if (shouldBurn && totalDeflationaryBurn > 0) {
+          await this.incrementPeriodBurn(totalDeflationaryBurn);
+        }
+
+        this.logger.log(`✅ Batched burn completed: ${burnSignature}`);
+      }
+
+      return signatures;
+
+    } catch (error) {
+      this.logger.error('Error in batched distribution execution:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mint tokens to college wallet
    */
-  private async transferTokens(
-    sourceAccount: string,
+  private async mintTokensToCollege(
     destinationWallet: string,
     amount: number
   ): Promise<string> {
     try {
-      const sourcePublicKey = new PublicKey(sourceAccount);
       const destinationWalletPublicKey = new PublicKey(destinationWallet);
       const amountBaseUnits = await this.toBaseUnits(amount);
 
@@ -280,7 +374,7 @@ export class FeeDistributorService {
       } catch (error) {
         // Account doesn't exist, need to create it
         const createATAInstruction = createAssociatedTokenAccountInstruction(
-          this.opsWalletKeypair.publicKey, // Payer (OPS wallet)
+          this.mintAuthorityKeypair.publicKey, // Payer (mint authority)
           destinationTokenAccount,
           destinationWalletPublicKey, // Owner
           this.mintPublicKey,
@@ -289,32 +383,29 @@ export class FeeDistributorService {
         transaction.add(createATAInstruction);
       }
 
-      const transferInstruction = createTransferCheckedInstruction(
-        sourcePublicKey,
+      // Add mint instruction
+      const mintInstruction = createMintToInstruction(
         this.mintPublicKey,
         destinationTokenAccount,
-        this.opsWalletKeypair.publicKey,
+        this.mintAuthorityKeypair.publicKey, // Mint authority
         amountBaseUnits,
-        await this.getMintDecimals(),
         [],
         TOKEN_2022_PROGRAM_ID
       );
 
-
-
-      transaction.add(transferInstruction);
+      transaction.add(mintInstruction);
 
       // Send and confirm transaction
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        [this.opsWalletKeypair], // OPS wallet as signer
+        [this.mintAuthorityKeypair], // Mint authority as signer
         { commitment: 'confirmed' }
       );
 
       return signature;
     } catch (error) {
-      throw new Error(`Failed to transfer tokens: ${error.message}`);
+      throw new Error(`Failed to mint tokens: ${error.message}`);
     }
   }
 
@@ -431,7 +522,6 @@ export class FeeDistributorService {
       where: {
         fee_harvested: true,
         fee_distributed: false,
-        from: Not(this.opsWalletAddress)
       },
       select: ['amount'],
     });
@@ -458,7 +548,6 @@ export class FeeDistributorService {
       where: {
         fee_harvested: true,
         fee_distributed: false,
-        from: Not(this.opsWalletAddress)
       },
       relations: ['linkedCollege'],
     });
@@ -519,7 +608,6 @@ export class FeeDistributorService {
       where: {
         fee_harvested: true,
         fee_distributed: false,
-        from: Not(this.opsWalletAddress)
       },
       relations: ['linkedCollege'],
       order: { timestamp: 'ASC' },
@@ -535,7 +623,6 @@ export class FeeDistributorService {
       where: {
         fee_harvested: true,
         fee_distributed: false,
-        from: Not(this.opsWalletAddress)
       },
     });
   }

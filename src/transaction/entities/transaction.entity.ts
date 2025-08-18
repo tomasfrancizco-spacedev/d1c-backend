@@ -21,6 +21,9 @@ export class Transaction {
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   d1cFee: number;
 
+  @Column({ type: 'int', nullable: true })
+  linkedCollegeId: number | null;
+
   @ManyToOne(() => College, { nullable: true })
   @JoinColumn({ name: 'linkedCollegeId' })
   linkedCollege: College | null;

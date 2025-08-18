@@ -1,4 +1,3 @@
-
 export interface CreateTransactionDto {
   from: string | null;
   to: string | null;

@@ -19,9 +19,6 @@ export class D1cWallet {
   @Column({ type: 'varchar', length: 44, unique: true })
   walletAddress: string;
 
-  @Column({ type: 'boolean', default: false })
-  fee_exempt: boolean;
-
   @CreateDateColumn()
   createdAt: Date;
 

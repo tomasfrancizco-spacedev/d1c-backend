@@ -81,7 +81,7 @@ export class FeeHarvesterService {
     };
 
     try {
-      // Get all transactions that haven't had fees harvested yet, excluding OPS wallet transactions
+      // Get all transactions that haven't had fees harvested yet
       const unharvestedTransactions = await this.transactionRepository.find({
         where: {
           fee_harvested: false,
@@ -98,11 +98,7 @@ export class FeeHarvesterService {
         return result;
       }
 
-      const sourcesToOps: { srcAta: PublicKey; txId: number }[] = [];
-      const sourcesToRecipient: { srcAta: PublicKey; recipientOwner: PublicKey; txId: number }[] = [];
-
-      // Pull fee-exempt addresses from DB (OPS likely included but not hardcoded)
-      const feeExemptAddresses = new Set(await this.d1cWalletService.getFeeExemptWalletAddresses());
+      const sources: { srcAta: PublicKey; txId: number }[] = [];
 
       for (const transaction of unharvestedTransactions) {
         if (transaction.to) {
@@ -127,14 +123,9 @@ export class FeeHarvesterService {
               const transferFeeAmount = getTransferFeeAmount(account);
 
               if (transferFeeAmount !== null && transferFeeAmount.withheldAmount > 0) {
-                if (transaction.from && feeExemptAddresses.has(transaction.from)) {
-                  this.logger.log(`Processing a fee refund for tx ${transaction.id} to ${transaction.to}`)
-                  sourcesToRecipient.push({ srcAta: recipientTokenAccount, recipientOwner: recipientPublicKey, txId: transaction.id });
-                } else {
-                  this.logger.log(`Processing a fee harvest for tx ${transaction.id} to ${transaction.to}`)
-                  sourcesToOps.push({ srcAta: recipientTokenAccount, txId: transaction.id });
-                  result.totalFeesHarvested += Number(transferFeeAmount.withheldAmount);
-                }
+                this.logger.log(`Processing a fee harvest for tx ${transaction.id} to ${transaction.to}`)
+                sources.push({ srcAta: recipientTokenAccount, txId: transaction.id });
+                result.totalFeesHarvested += Number(transferFeeAmount.withheldAmount);
               }
 
             }
@@ -144,17 +135,17 @@ export class FeeHarvesterService {
         }
       }
 
-      if (sourcesToOps.length > 0) {
+      if (sources.length > 0) {
         const opsTokenAccount = await createAssociatedTokenAccountIdempotent( // check if this is necessary
           this.connection,
-          this.withdrawAuthorityKeypair,               // payer (or use ops wallet if you prefer)
+          this.withdrawAuthorityKeypair,               // payer
           this.mintPublicKey,
           this.opsWalletKeypair.publicKey,
           { commitment: 'confirmed' },                // optional
           TOKEN_2022_PROGRAM_ID
         );
 
-        const uniqueSources = this.dedupePks(sourcesToOps.map(x => {
+        const uniqueSources = this.dedupePks(sources.map(x => {
           return {
             srcAta: x.srcAta,
             txId: x.txId
@@ -177,59 +168,10 @@ export class FeeHarvesterService {
 
         // mark only those txs whose src we actually processed
         const processedIds = new Set(uniqueSources.map(pk => pk.srcAta.toBase58()));
-        const okIds = sourcesToOps.filter(x => processedIds.has(x.srcAta.toBase58())).map(x => x.txId);
+        const okIds = sources.filter(x => processedIds.has(x.srcAta.toBase58())).map(x => x.txId);
         if (okIds.length) {
           await this.transactionRepository.update(okIds, { fee_harvested: true });
           result.transactionsProcessed += okIds.length;
-        }
-      }
-
-      // 3b) OPS-initiated txs → withdraw back to each RECIPIENT’s ATA (one-by-one)
-
-      // what if two different wallets send tokens to the same address?
-      // what if one of these two wallets is fee exempt and the other one isnt?
-
-      if (sourcesToRecipient.length > 0) {
-        const uniqueRecipients = this.dedupePks(sourcesToRecipient.map(x => {
-          return {
-            srcAta: x.srcAta,
-            recipientOwner: x.recipientOwner,
-            txId: x.txId
-          }
-        }));
-
-        for (const item of uniqueRecipients) {
-          try {
-            const recipientAta = await getAssociatedTokenAddress(
-              this.mintPublicKey,
-              item.recipientOwner!,
-              false,
-              TOKEN_2022_PROGRAM_ID
-            );
-
-            // Withdraw FROM the recipient’s ATA back TO the recipient’s ATA (refund fee)
-            const sig = await withdrawWithheldTokensFromAccounts(
-              this.connection,
-              this.withdrawAuthorityKeypair,       // payer
-              this.mintPublicKey,
-              recipientAta,                        // DESTINATION (recipient ATA)
-              this.withdrawAuthorityKeypair,       // withdraw authority
-              [],
-              [item.srcAta],                       // SOURCE (same recipient ATA)
-              undefined,
-              TOKEN_2022_PROGRAM_ID
-            );
-
-            this.logger.log(`Refunded withheld fee to recipient ${item.srcAta.toBase58()}. Sig: ${sig}`);
-
-            await this.transactionRepository.update(item.txId, { fee_harvested: true, fee_distributed: true });
-            result.transactionsProcessed += 1;
-          } catch (error) {
-            const msg = `Refund failed for tx ${item.txId}: ${error.message}`;
-            this.logger.error(msg);
-            result.success = false;
-            result.errors.push(msg);
-          }
         }
       }
 
@@ -310,7 +252,7 @@ export class FeeHarvesterService {
             this.opsWalletKeypair, // Payer (OPS wallet)
             this.mintPublicKey,
             opsTokenAccount, // Destination account for fee withdrawal (OPS wallet)
-            this.withdrawAuthorityKeypair, // Authority for fee withdrawal (OPS wallet) @tomas this should be a different keypair
+            this.withdrawAuthorityKeypair, // Authority for fee withdrawal (OPS wallet)
             [], // Additional signers
             accountsToWithdrawFrom, // Token Accounts to withdraw from
             undefined, // Confirmation options
