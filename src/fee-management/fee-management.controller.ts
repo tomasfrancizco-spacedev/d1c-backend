@@ -5,16 +5,18 @@ import { FeeDistributorService, DistributionResult } from './services/fee-distri
 import { HarvestAndDistributeFeesDto } from './dto/harvest-and-distribute-fees.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
+import { FeeSchedulerService } from './services/fee-scheduler-service';
 
 @ApiTags('Fee Management')
 @Controller('fee-management')
 export class FeeManagementController {
   private readonly logger = new Logger(FeeManagementController.name);
- 
+
   constructor(
     private readonly feeHarvesterService: FeeHarvesterService,
     private readonly feeDistributorService: FeeDistributorService,
-  ) {}
+    private readonly feeSchedulerService: FeeSchedulerService,
+  ) { }
 
   @Post('harvest-from-transactions')
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -97,7 +99,7 @@ export class FeeManagementController {
     distributionResult: DistributionResult;
   }> {
     this.logger.log('Starting complete fee processing cycle');
-    
+
     const useTransactionBased = body?.useTransactionBased ?? true;
 
     // Step 1: Harvest fees to OPS wallet
@@ -198,5 +200,18 @@ export class FeeManagementController {
   async markTransactionsAsDistributed(@Body() body: { transactionIds: number[] }): Promise<{ success: boolean }> {
     await this.feeDistributorService.markTransactionsAsDistributed(body.transactionIds);
     return { success: true };
+  }
+
+  @Post('trigger-automated-processing')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually trigger automated fee processing (for testing)' })
+  @ApiResponse({ status: 200, description: 'Automated processing triggered successfully' })
+  async triggerAutomatedProcessing(): Promise<{
+    harvestResult: HarvestResult;
+    distributionResult: DistributionResult;
+  }> {
+    this.logger.log('Manually triggering automated fee processing');
+    return await this.feeSchedulerService.triggerManualProcessing();
   }
 }
