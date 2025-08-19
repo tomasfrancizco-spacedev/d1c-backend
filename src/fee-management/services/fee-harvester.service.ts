@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import {
   TOKEN_2022_PROGRAM_ID,
@@ -319,7 +319,6 @@ export class FeeHarvesterService {
     return await this.transactionRepository.count({
       where: {
         fee_harvested: false,
-        from: Not(this.opsWalletAddress)
       },
     });
   }
@@ -331,7 +330,6 @@ export class FeeHarvesterService {
     return await this.transactionRepository.find({
       where: {
         fee_harvested: false,
-        from: Not(this.opsWalletAddress)
       },
       relations: ['linkedCollege'],
       order: { timestamp: 'ASC' },

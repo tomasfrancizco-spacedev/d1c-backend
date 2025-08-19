@@ -141,13 +141,20 @@ export class UserService {
   }
 
   async handleUserLogin(walletAddress: string, createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.findUserByWalletAddress(walletAddress);
+    try {
+      const existingUser = await this.findUserByWalletAddress(walletAddress);
 
-    if (existingUser) {
-      const updatedUser = await this.updateLastLogin(existingUser.id);
-      return updatedUser || existingUser;
-    } else {
-      return await this.createUser(createUserDto);
+      if (existingUser) {
+        const updatedUser = await this.updateLastLogin(existingUser.id);
+        return updatedUser || existingUser;
+      } else {
+        return await this.createUser(createUserDto);
+      }
+    } catch (error) {
+      throw new HttpException(
+        'Failed to handle user login. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
@@ -177,6 +184,17 @@ export class UserService {
     } catch (error) {
       throw new HttpException(
         'Failed to remove user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async findAllAdmins(): Promise<User[]> {
+    try {
+      return await this.userRepository.find({ where: { isAdmin: true }, relations: ['currentLinkedCollege'] });
+    } catch (error) {
+      throw new HttpException(
+        'Failed to find all admins. Please try again.',
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

@@ -1,11 +1,14 @@
-import { Controller, Post, Get, Logger, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Logger, Body, UseGuards, Query, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { FeeHarvesterService, HarvestResult } from './services/fee-harvester.service';
 import { FeeDistributorService, DistributionResult } from './services/fee-distributor.service';
 import { HarvestAndDistributeFeesDto } from './dto/harvest-and-distribute-fees.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
 import { FeeSchedulerService } from './services/fee-scheduler-service';
+import { FeeJobLog } from './entities/fee-job-log.entity';
 
 @ApiTags('Fee Management')
 @Controller('fee-management')
@@ -16,6 +19,8 @@ export class FeeManagementController {
     private readonly feeHarvesterService: FeeHarvesterService,
     private readonly feeDistributorService: FeeDistributorService,
     private readonly feeSchedulerService: FeeSchedulerService,
+    @InjectRepository(FeeJobLog)
+    private readonly feeJobLogRepository: Repository<FeeJobLog>,
   ) { }
 
   @Post('harvest-from-transactions')
@@ -213,5 +218,55 @@ export class FeeManagementController {
   }> {
     this.logger.log('Manually triggering automated fee processing');
     return await this.feeSchedulerService.triggerManualProcessing();
+  }
+
+  // Simple Job Log Endpoints
+
+  @Get('job-logs')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get recent fee job logs' })
+  @ApiResponse({ status: 200, description: 'Job logs retrieved successfully' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records to return (default 50)' })
+  async getJobLogs(@Query('limit') limit: number = 50): Promise<FeeJobLog[]> {
+    return await this.feeJobLogRepository.find({
+      order: { executedAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  @Get('job-logs/summary')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get simple job execution summary' })
+  @ApiResponse({ status: 200, description: 'Job summary retrieved successfully' })
+  async getJobSummary(): Promise<{
+    totalJobs: number;
+    successfulJobs: number;
+    failedJobs: number;
+    totalFeesHarvested: number;
+    totalFeesDistributed: number;
+    totalFeesBurned: number;
+  }> {
+    const [stats] = await this.feeJobLogRepository
+      .createQueryBuilder('job')
+      .select([
+        'COUNT(*) as totalJobs',
+        'COUNT(CASE WHEN job.success = true THEN 1 END) as successfulJobs',
+        'COUNT(CASE WHEN job.success = false THEN 1 END) as failedJobs',
+        'SUM(job.harvestedAmount) as totalFeesHarvested',
+        'SUM(job.distributedAmount) as totalFeesDistributed',
+        'SUM(job.burnedAmount) as totalFeesBurned',
+      ])
+      .getRawOne();
+
+    return {
+      totalJobs: parseInt(stats.totalJobs) || 0,
+      successfulJobs: parseInt(stats.successfulJobs) || 0,
+      failedJobs: parseInt(stats.failedJobs) || 0,
+      totalFeesHarvested: parseFloat(stats.totalFeesHarvested) || 0,
+      totalFeesDistributed: parseFloat(stats.totalFeesDistributed) || 0,
+      totalFeesBurned: parseFloat(stats.totalFeesBurned) || 0,
+    };
   }
 }

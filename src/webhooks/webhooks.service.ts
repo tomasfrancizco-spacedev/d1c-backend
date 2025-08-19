@@ -69,17 +69,12 @@ export class WebhooksService {
 
     let linkedCollege: College | null = null;
 
-    console.log({ user });
-
     if (user && user.currentLinkedCollege) { 
       // User exists and has linked school
       linkedCollege = user.currentLinkedCollege;
     } else {
       linkedCollege = null;
     }
-
-    console.log({ linkedCollege });
-    console.log("linked college id", linkedCollege?.id);
 
     // Save to TRANSACTIONS table
     try {

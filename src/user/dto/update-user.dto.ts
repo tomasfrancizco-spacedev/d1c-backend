@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateUserDto } from './create-user.dto';
-import { IsArray, IsDate, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDate, IsEmail, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { College } from '../../college/entities/college.entity';
 
