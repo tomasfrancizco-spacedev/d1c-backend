@@ -586,8 +586,7 @@ export class FeeDistributorService {
     const harvestedNotDistributedTransactions = await this.transactionRepository.find({
       where: {
         fee_harvested: true,
-        fee_distributed: false,
-        from: Not(this.opsWalletAddress)
+        fee_distributed: false
       },
       relations: ['linkedCollege'],
       order: { timestamp: 'ASC' },

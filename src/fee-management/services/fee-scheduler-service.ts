@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { FeeHarvesterService } from './fee-harvester.service';
 import { FeeDistributorService } from './fee-distributor.service';
 import { ConfigService } from '@nestjs/config';
+import { FeeJobLog } from '../entities/fee-job-log.entity';
 
 @Injectable()
 export class FeeSchedulerService {
@@ -13,6 +16,8 @@ export class FeeSchedulerService {
     private readonly feeHarvesterService: FeeHarvesterService,
     private readonly feeDistributorService: FeeDistributorService,
     private readonly configService: ConfigService,
+    @InjectRepository(FeeJobLog)
+    private readonly feeJobLogRepository: Repository<FeeJobLog>,
   ) {}
 
   /**
@@ -39,47 +44,54 @@ export class FeeSchedulerService {
     }
 
     this.isProcessing = true;
-    const startTime = Date.now();
 
     try {
       this.logger.log('🚀 Starting automated fee processing cycle...');
 
       // Step 1: Harvest fees to OPS wallet
-      this.logger.log('Step 1: Harvesting fees to OPS wallet...');
       const harvestResult = await this.feeHarvesterService.harvestFeesFromTransactions();
 
       if (!harvestResult.success) {
         this.logger.error('❌ Fee harvesting failed:', harvestResult.errors);
+        await this.logJobExecution(false, 0, 0, 0, harvestResult.errors.join('; '));
         return;
       }
 
       if (harvestResult.totalFeesHarvested === 0) {
         this.logger.log('ℹ️  No fees to harvest, skipping distribution');
+        await this.logJobExecution(true, 0, 0, 0, null);
         return;
       }
 
       this.logger.log(`✅ Harvested ${harvestResult.totalFeesHarvested} tokens from ${harvestResult.transactionsProcessed} transactions`);
 
       // Step 2: Distribute fees from OPS wallet
-      this.logger.log('Step 2: Distributing fees from OPS wallet...');
       const distributionResult = await this.feeDistributorService.distributeFees();
 
       if (!distributionResult.success) {
         this.logger.error('❌ Fee distribution failed:', distributionResult.errors);
+        await this.logJobExecution(false, harvestResult.totalFeesHarvested, 0, 0, `Distribution failed: ${distributionResult.errors.join('; ')}`);
         return;
       }
 
-      const processingTime = Date.now() - startTime;
-      this.logger.log(`🎉 Automated fee processing completed successfully in ${processingTime}ms`);
+      // Log successful execution
+      await this.logJobExecution(
+        true,
+        harvestResult.totalFeesHarvested,
+        distributionResult.collegeAmount,
+        distributionResult.burnedAmount,
+        null
+      );
+
+      this.logger.log(`🎉 Automated fee processing completed successfully`);
       this.logger.log(`📊 Summary:
         - Harvested: ${harvestResult.totalFeesHarvested} tokens
         - Distributed to colleges: ${distributionResult.collegeAmount} tokens
-        - Burned (deflationary): ${distributionResult.burnedAmount} tokens
-        - Transactions processed: ${distributionResult.transactionsProcessed}
-        - Blockchain signatures: ${distributionResult.signatures.length}`);
+        - Burned (deflationary): ${distributionResult.burnedAmount} tokens`);
 
     } catch (error) {
       this.logger.error('💥 Automated fee processing failed with error:', error);
+      await this.logJobExecution(false, 0, 0, 0, error.message);
     } finally {
       this.isProcessing = false;
     }
@@ -94,29 +106,50 @@ export class FeeSchedulerService {
   }> {
     this.logger.log('🔧 Manual fee processing triggered');
     
-    const harvestResult = await this.feeHarvesterService.harvestFeesFromTransactions();
-    
-    if (!harvestResult.success || harvestResult.totalFeesHarvested === 0) {
+    try {
+      const harvestResult = await this.feeHarvesterService.harvestFeesFromTransactions();
+      
+      if (!harvestResult.success || harvestResult.totalFeesHarvested === 0) {
+        await this.logJobExecution(
+          harvestResult.success,
+          harvestResult.totalFeesHarvested,
+          0,
+          0,
+          harvestResult.success ? null : harvestResult.errors.join('; ')
+        );
+        
+        return {
+          harvestResult,
+          distributionResult: {
+            success: false,
+            transactionsProcessed: 0,
+            opsAmount: 0,
+            collegeAmount: 0,
+            burnedAmount: 0,
+            errors: [],
+            signatures: [],
+          },
+        };
+      }
+
+      const distributionResult = await this.feeDistributorService.distributeFees();
+      
+      await this.logJobExecution(
+        distributionResult.success,
+        harvestResult.totalFeesHarvested,
+        distributionResult.collegeAmount,
+        distributionResult.burnedAmount,
+        distributionResult.success ? null : distributionResult.errors.join('; ')
+      );
+      
       return {
         harvestResult,
-        distributionResult: {
-          success: false,
-          transactionsProcessed: 0,
-          opsAmount: 0,
-          collegeAmount: 0,
-          burnedAmount: 0,
-          errors: [],
-          signatures: [],
-        },
+        distributionResult,
       };
+    } catch (error) {
+      await this.logJobExecution(false, 0, 0, 0, error.message);
+      throw error;
     }
-
-    const distributionResult = await this.feeDistributorService.distributeFees();
-    
-    return {
-      harvestResult,
-      distributionResult,
-    };
   }
 
   /**
@@ -136,6 +169,31 @@ export class FeeSchedulerService {
       }
     } catch (error) {
       this.logger.error('Health check failed:', error);
+    }
+  }
+
+  /**
+   * Simple method to log job execution
+   */
+  private async logJobExecution(
+    success: boolean,
+    harvestedAmount: number,
+    distributedAmount: number,
+    burnedAmount: number,
+    errorMessage: string | null
+  ): Promise<void> {
+    try {
+      const jobLog = this.feeJobLogRepository.create({
+        executedAt: new Date(),
+        success,
+        harvestedAmount,
+        distributedAmount,
+        burnedAmount,
+        errorMessage,
+      });
+      await this.feeJobLogRepository.save(jobLog);
+    } catch (error) {
+      this.logger.error('Failed to log job execution:', error);
     }
   }
 }

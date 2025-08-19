@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
@@ -32,9 +32,22 @@ export class TransactionService {
     });
   }
 
-  async findAll(): Promise<Transaction[]> {
+  async findAll(limit: number, offset: number): Promise<Transaction[]> {
     return await this.transactionRepository.find({
-      order: { timestamp: 'DESC' }
+      order: { timestamp: 'DESC' },
+      take: limit,
+      skip: offset
     });
   }
+
+  async getTransactionsByUserWalletAddress(userWalletAddress: string, limit: number, offset: number): Promise<Transaction[]> {
+    const transactions = await this.transactionRepository.find({
+      where: { from: userWalletAddress },
+      order: { timestamp: 'DESC' },
+      take: limit,
+      skip: offset
+    });
+
+    return transactions;
+  } 
 } 

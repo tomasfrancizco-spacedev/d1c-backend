@@ -8,6 +8,7 @@ import { FeeSchedulerService } from './services/fee-scheduler-service';
 import { FeeManagementController } from './fee-management.controller';
 import { Transaction } from '../transaction/entities/transaction.entity';
 import { BurnTracker } from './entities/burn-tracker.entity';
+import { FeeJobLog } from './entities/fee-job-log.entity';
 import { D1cWalletModule } from '../d1c-wallet/d1c-wallet.module';
 import { TransactionModule } from '../transaction/transaction.module';
 import { CollegeModule } from '../college/college.module';
@@ -17,7 +18,7 @@ import { UserModule } from 'src/user/user.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([Transaction, BurnTracker]),
+    TypeOrmModule.forFeature([Transaction, BurnTracker, FeeJobLog]),
     ConfigModule,
     D1cWalletModule,
     TransactionModule,

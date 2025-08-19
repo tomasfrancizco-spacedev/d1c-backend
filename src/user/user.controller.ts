@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } 
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { AdminGuard } from 'src/auth/guards/admin.guard';
 
 @ApiTags('Users')
 @Controller('user')
@@ -65,6 +66,15 @@ export class UserController {
     const limitNum = limit ? parseInt(limit) : 20;
     const offsetNum = offset ? parseInt(offset) : 0;
     return this.userService.findAllUser(limitNum, offsetNum);
+  }
+
+  @Get('admins')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all admins' })
+  @ApiResponse({ status: 200, description: 'Admins retrieved successfully' })
+  findAllAdmins() {
+    return this.userService.findAllAdmins();
   }
 
   @Get(':id')
