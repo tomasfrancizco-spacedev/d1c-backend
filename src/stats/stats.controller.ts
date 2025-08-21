@@ -32,6 +32,7 @@ export class StatsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Number of colleges to return (default: 20)' })
   @ApiResponse({ status: 200, description: 'College leaderboard retrieved successfully' })
   async findAllCollege(@Query('limit') limit?: string) {
+    console.log("College leaderboard query........");
     const limitNum = limit ? parseInt(limit, 10) : 20;
     return await this.statsService.getCollegeLeaderboard(limitNum);
   }

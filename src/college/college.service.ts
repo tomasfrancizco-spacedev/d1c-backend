@@ -1,14 +1,18 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateCollegeDto } from './dto/create-college.dto';
 import { UpdateCollegeDto } from './dto/update-college.dto';
 import { College } from './entities/college.entity';
 import { DeepPartial, DeleteResult, Repository } from 'typeorm';
+import { User } from 'src/user/entities/user.entity';
+import { Transaction } from 'src/transaction/entities/transaction.entity';          
 
 @Injectable()
 export class CollegeService {
   constructor(
     @InjectRepository(College) private readonly collegeRepository: Repository<College>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Transaction) private readonly transactionRepository: Repository<Transaction>,   
   ) {}
 
   async create(createCollegeDto: CreateCollegeDto): Promise<College> {
@@ -71,6 +75,31 @@ export class CollegeService {
   }
 
   async remove(id: number): Promise<DeleteResult> {
+    // Check for users linked to this college
+    const usersCount = await this.userRepository.count({
+      where: { currentLinkedCollege: { id } }
+    });
+    if (usersCount > 0) {
+      throw new BadRequestException(`Cannot delete college: ${usersCount} users are linked to it`);
+    }
+
+    // Check for transactions linked to this college that are not fully processed
+    const transactionsCount = await this.transactionRepository.count({
+      where: [
+        {
+          linkedCollege: { id },
+          fee_harvested: false,
+        },
+        {
+          linkedCollege: { id },
+          fee_distributed: false,
+        },
+      ],
+    });
+    if (transactionsCount > 0) {
+      throw new BadRequestException(`Cannot delete college: ${transactionsCount} transactions are linked to it`);
+    }
+
     return await this.collegeRepository.delete(id);
   }
-} 
+}

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Connection, PublicKey, Keypair, Transaction as SolanaTransaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import {
   TOKEN_2022_PROGRAM_ID,
@@ -44,7 +44,6 @@ export class FeeDistributorService {
   private readonly mintPublicKey: PublicKey;
   private readonly opsWalletKeypair: Keypair;
   private readonly mintAuthorityKeypair: Keypair;
-  private readonly opsWalletAddress: string;
 
   constructor(
     @InjectRepository(Transaction)
@@ -70,7 +69,6 @@ export class FeeDistributorService {
     this.opsWalletKeypair = Keypair.fromSecretKey(
       new Uint8Array(JSON.parse(opsWalletSecret))
     );
-    this.opsWalletAddress = this.opsWalletKeypair.publicKey.toString();
 
     const mintAuthoritySecret = this.configService.get<string>('MINT_AUTHORITY_SECRET_KEY');
     if (!mintAuthoritySecret) {
@@ -85,9 +83,18 @@ export class FeeDistributorService {
   private static readonly ANNUAL_BURN_CAP_TOKENS = 100_000; // 100k tokens per period
 
   /**
+   * Precision-safe percentage calculation using basis points to avoid floating-point errors
+   */
+  private calculatePercentage(amount: number, percentage: number): number {
+    // Convert percentage to basis points (0.02 -> 200) to avoid floating-point multiplication
+    const basisPoints = Math.round(percentage * 10000);
+    return Math.floor((amount * basisPoints * 100000000)) / 100000000 / 10000;
+  }
+
+  /**
    * Distribute fees from OPS wallet to college/community wallets and burn
    */
-  async distributeFees(): Promise<DistributionResult> {
+  async distributeFeesFromTransactions(): Promise<DistributionResult> {
     const result: DistributionResult = {
       success: true,
       transactionsProcessed: 0,
@@ -158,7 +165,7 @@ export class FeeDistributorService {
       result.transactionsProcessed = harvestedNotDistributedTransactions.length;
 
     } catch (error) {
-      this.logger.error('Error in distributeFees:', error);
+      this.logger.error('Error in distributeFeesFromTransactions:', error);
       result.success = false;
       result.errors.push(error.message);
     }
@@ -182,10 +189,9 @@ export class FeeDistributorService {
     for (const transaction of transactions) {
       const totalFee = transaction.amount;
 
-      // Calculate fee breakdown (OPS fees are already collected during harvesting)
-      // Only distribute college/community fees (2%) and burn (0.5%)
-      const collegeAmount = totalFee * D1C_FEE_PERCENTAGE_FOR_COLLEGE;
-      const burnAmount = totalFee * D1C_FEE_PERCENTAGE_TO_BURN;
+      // Calculate fee breakdown using precision-safe method
+      const collegeAmount = this.calculatePercentage(totalFee, D1C_FEE_PERCENTAGE_FOR_COLLEGE);
+      const burnAmount = this.calculatePercentage(totalFee, D1C_FEE_PERCENTAGE_TO_BURN);
 
       // Determine college wallet (linked college or community)
       let collegeWalletAddress = communityWallet;
@@ -210,64 +216,6 @@ export class FeeDistributorService {
     }
 
     return Array.from(distributions.values());
-  }
-
-  /**
-   * Execute a single fee distribution (mint/burn approach for supply neutrality)
-   */
-  private async executeDistribution(
-    sourceTokenAccount: string,
-    distribution: FeeDistribution
-  ): Promise<string[]> {
-    const signatures: string[] = [];
-
-    try {
-      // Enforce burn cap per active period: burn all or none
-      let shouldBurn = false;
-      if (distribution.burnAmount > 0) {
-        shouldBurn = await this.canBurnFullAmountThisPeriod(distribution.burnAmount);
-      }
-
-      // Calculate amounts to mint (college + potential extra burn if cap exceeded)
-      const collegeMintAmount = distribution.collegeAmount + (shouldBurn ? 0 : distribution.burnAmount);
-
-      // Mint tokens to college wallet (supply neutral mint)
-      if (collegeMintAmount > 0) {
-        const mintSignature = await this.mintTokensToCollege(
-          distribution.collegeWallet,
-          collegeMintAmount
-        );
-        signatures.push(mintSignature);
-        this.logger.log(`Minted ${collegeMintAmount} tokens to college/community wallet: ${mintSignature}`);
-      }
-
-      // Burn college amount from OPS to maintain supply neutrality
-      if (distribution.collegeAmount > 0) {
-        const collegeBurnSignature = await this.burnTokens(
-          sourceTokenAccount,
-          distribution.collegeAmount
-        );
-        signatures.push(collegeBurnSignature);
-        this.logger.log(`Burned ${distribution.collegeAmount} tokens from OPS (supply neutral): ${collegeBurnSignature}`);
-      }
-
-      // Burn deflationary amount if allowed and update tracker
-      if (shouldBurn && distribution.burnAmount > 0) {
-        const deflationaryBurnSignature = await this.burnTokens(
-          sourceTokenAccount,
-          distribution.burnAmount
-        );
-        signatures.push(deflationaryBurnSignature);
-        await this.incrementPeriodBurn(distribution.burnAmount);
-        this.logger.log(`Burned ${distribution.burnAmount} tokens (deflationary): ${deflationaryBurnSignature}`);
-      }
-
-    } catch (error) {
-      this.logger.error('Error executing distribution:', error);
-      throw error;
-    }
-
-    return signatures;
   }
 
   /**
@@ -530,14 +478,14 @@ export class FeeDistributorService {
     const distributionPercentage = D1C_FEE_PERCENTAGE_FOR_COLLEGE + D1C_FEE_PERCENTAGE_TO_BURN;
 
     return harvestedNotDistributedTransactions.reduce((total, transaction) =>
-      total + (transaction.amount * distributionPercentage), 0
+      total + this.calculatePercentage(transaction.amount, distributionPercentage), 0
     );
   }
 
   /**
    * Get distribution summary for reporting
    */
-  async getDistributionSummary(): Promise<{
+  async getPendingDistributionSummary(): Promise<{
     totalTransactionAmount: number;
     collegeAmount: number;
     burnAmount: number;
@@ -559,7 +507,7 @@ export class FeeDistributorService {
     for (const transaction of harvestedNotDistributedTransactions) {
       totalTransactionAmount += transaction.amount;
 
-      const collegeAmount = transaction.amount * D1C_FEE_PERCENTAGE_FOR_COLLEGE;
+      const collegeAmount = this.calculatePercentage(transaction.amount, D1C_FEE_PERCENTAGE_FOR_COLLEGE);
 
       if (transaction.linkedCollege?.walletAddress) {
         linkedCollegeAmount += collegeAmount;
@@ -568,7 +516,7 @@ export class FeeDistributorService {
       }
     }
 
-    const burnAmount = totalTransactionAmount * D1C_FEE_PERCENTAGE_TO_BURN;
+    const burnAmount = this.calculatePercentage(totalTransactionAmount, D1C_FEE_PERCENTAGE_TO_BURN);
 
     return {
       totalTransactionAmount,
