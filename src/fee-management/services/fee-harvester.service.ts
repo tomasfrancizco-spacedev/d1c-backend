@@ -186,7 +186,7 @@ export class FeeHarvesterService {
   }
 
   /**
-   * Alternative method: Harvest fees by scanning all token accounts
+   * Backup method: Harvest fees by scanning all token accounts
    * This method fetches all token accounts for the mint and withdraws fees directly to OPS wallet
    */
   async harvestFeesFromAllAccounts(): Promise<HarvestResult> {
@@ -239,17 +239,19 @@ export class FeeHarvesterService {
       this.logger.log(`Found ${accountsToWithdrawFrom.length} accounts with withheld tokens. Total withheld: ${totalWithheldAmount}`);
 
       if (accountsToWithdrawFrom.length > 0) {
-        const opsTokenAccount = await getAssociatedTokenAddress(
+        const opsTokenAccount = await createAssociatedTokenAccountIdempotent( // check if this is necessary
+          this.connection,
+          this.withdrawAuthorityKeypair,               // payer
           this.mintPublicKey,
           this.opsWalletKeypair.publicKey,
-          false,
+          { commitment: 'confirmed' },                // optional
           TOKEN_2022_PROGRAM_ID
         );
         // Withdraw withheld tokens directly from accounts to OPS wallet
         try {
           const signature = await withdrawWithheldTokensFromAccounts(
             this.connection,
-            this.opsWalletKeypair, // Payer (OPS wallet)
+            this.withdrawAuthorityKeypair,       // payer
             this.mintPublicKey,
             opsTokenAccount, // Destination account for fee withdrawal (OPS wallet)
             this.withdrawAuthorityKeypair, // Authority for fee withdrawal (OPS wallet)
@@ -261,13 +263,50 @@ export class FeeHarvesterService {
 
           this.logger.log(`Withdrew fees from ${accountsToWithdrawFrom.length} accounts. Transaction: ${signature}`);
           result.totalFeesHarvested = totalWithheldAmount;
-          result.transactionsProcessed = accountsToWithdrawFrom.length;
+
+          // Find and mark transactions as harvested for accounts we processed
+          try {
+            // Convert PublicKeys to base58 strings for database comparison
+            const harvestedAccountAddresses = accountsToWithdrawFrom.map(pk => pk.toString());
+
+            this.logger.log(`Looking for transactions with 'to' addresses in: ${harvestedAccountAddresses.slice(0, 5).join(', ')}${harvestedAccountAddresses.length > 5 ? '...' : ''}`);
+
+            // Find transaction IDs that match the harvested account addresses and are not yet marked as harvested
+            const transactionIdsToUpdate = await this.transactionRepository
+              .createQueryBuilder('transaction')
+              .select('transaction.id')
+              .where('transaction.fee_harvested = :harvested', { harvested: false })
+              .andWhere('transaction.to IN (:...addresses)', { addresses: harvestedAccountAddresses })
+              .getMany();
+
+            if (transactionIdsToUpdate.length > 0) {
+              const idsToUpdate = transactionIdsToUpdate.map(tx => tx.id);
+              await this.transactionRepository.update(idsToUpdate, { fee_harvested: true });
+
+              this.logger.log(`Marked ${idsToUpdate.length} transactions as fee_harvested after account-based harvest`);
+              result.transactionsProcessed = idsToUpdate.length;
+            } else {
+              this.logger.log('No matching transactions found to mark as harvested');
+              result.transactionsProcessed = 0;
+            }
+
+          } catch (dbError) {
+            const errorMsg = `Failed to update transaction records: ${dbError.message}`;
+            this.logger.warn(errorMsg);
+            result.errors.push(errorMsg);
+            // Don't fail the entire operation since the fee withdrawal was successful
+            result.transactionsProcessed = 0;
+          }
         } catch (error) {
           const errorMsg = `Failed to withdraw fees from accounts: ${error.message}`;
           this.logger.error(errorMsg);
           result.errors.push(errorMsg);
           result.success = false;
         }
+      } else {
+        this.logger.log('No accounts with withheld tokens found');
+        result.success = false;
+        result.errors.push('No accounts with withheld tokens found');
       }
 
     } catch (error) {
@@ -277,39 +316,6 @@ export class FeeHarvesterService {
     }
 
     return result;
-  }
-
-
-
-  /**
-   * Withdraw all harvested fees from the mint account to OPS wallet
-   */
-  async withdrawFeesFromMint(): Promise<string> {
-    try {
-      const opsTokenAccount = await getAssociatedTokenAddress(
-        this.mintPublicKey,
-        this.opsWalletKeypair.publicKey,
-        false,
-        TOKEN_2022_PROGRAM_ID
-      );
-
-      const signature = await withdrawWithheldTokensFromMint(
-        this.connection,
-        this.opsWalletKeypair, // Payer (OPS wallet)
-        this.mintPublicKey,
-        opsTokenAccount, // OPS wallet token account
-        this.withdrawAuthorityKeypair, // Withdraw Authority (OPS wallet)
-        undefined, // Additional signers
-        undefined, // Confirmation options
-        TOKEN_2022_PROGRAM_ID,
-      );
-
-      this.logger.log(`Withdrew fees from mint to OPS wallet. Transaction: ${signature}`);
-      return signature;
-    } catch (error) {
-      this.logger.error('Error withdrawing fees from mint:', error);
-      throw error;
-    }
   }
 
   /**
@@ -347,5 +353,53 @@ export class FeeHarvesterService {
     );
 
     this.logger.log(`Manually marked ${transactionIds.length} transactions as fee_harvested`);
+  }
+
+  async getUnharvestedAccountsSummary(): Promise<{ accounts: PublicKey[], count: number, amount: number }> {
+
+    try {
+      const allAccounts = await this.connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
+        commitment: 'confirmed',
+        filters: [
+          {
+            memcmp: {
+              offset: 0,
+              bytes: this.mintPublicKey.toString(),
+            },
+          },
+        ],
+      });
+
+      // List of Token Accounts to withdraw fees from
+      const accountsToWithdrawFrom: PublicKey[] = [];
+      let totalWithheldAmount = 0;
+
+      for (const accountInfo of allAccounts) {
+        try {
+          const account = unpackAccount(
+            accountInfo.pubkey,
+            accountInfo.account,
+            TOKEN_2022_PROGRAM_ID,
+          );
+
+          // Extract transfer fee data from each account
+          const transferFeeAmount = getTransferFeeAmount(account);
+
+          // Check if fees are available to be withdrawn
+          if (transferFeeAmount !== null && transferFeeAmount.withheldAmount > 0) {
+            accountsToWithdrawFrom.push(accountInfo.pubkey);
+            totalWithheldAmount += Number(transferFeeAmount.withheldAmount);
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to process account ${accountInfo.pubkey.toString()}: ${error.message}`);
+        }
+      }
+
+      this.logger.log(`Found ${accountsToWithdrawFrom.length} accounts with withheld tokens. Total withheld: ${totalWithheldAmount}`);
+      return { accounts: accountsToWithdrawFrom, count: accountsToWithdrawFrom.length, amount: totalWithheldAmount };
+    } catch (error) {
+      this.logger.error('Error in getUnharvestedAccountsSummary:', error);
+      throw error;
+    }
   }
 }

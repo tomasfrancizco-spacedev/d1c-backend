@@ -66,7 +66,7 @@ export class FeeSchedulerService {
       this.logger.log(`✅ Harvested ${harvestResult.totalFeesHarvested} tokens from ${harvestResult.transactionsProcessed} transactions`);
 
       // Step 2: Distribute fees from OPS wallet
-      const distributionResult = await this.feeDistributorService.distributeFees();
+      const distributionResult = await this.feeDistributorService.distributeFeesFromTransactions();
 
       if (!distributionResult.success) {
         this.logger.error('❌ Fee distribution failed:', distributionResult.errors);
@@ -132,7 +132,7 @@ export class FeeSchedulerService {
         };
       }
 
-      const distributionResult = await this.feeDistributorService.distributeFees();
+      const distributionResult = await this.feeDistributorService.distributeFeesFromTransactions();
       
       await this.logJobExecution(
         distributionResult.success,

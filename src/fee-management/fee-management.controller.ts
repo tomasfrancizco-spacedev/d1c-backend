@@ -1,5 +1,5 @@
-import { Controller, Post, Get, Logger, Body, UseGuards, Query, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { Controller, Post, Get, Logger, Body, UseGuards, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FeeHarvesterService, HarvestResult } from './services/fee-harvester.service';
@@ -9,6 +9,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
 import { FeeSchedulerService } from './services/fee-scheduler-service';
 import { FeeJobLog } from './entities/fee-job-log.entity';
+import { PublicKey } from '@solana/web3.js';
 
 @ApiTags('Fee Management')
 @Controller('fee-management')
@@ -43,34 +44,32 @@ export class FeeManagementController {
     return await this.feeHarvesterService.harvestFeesFromAllAccounts();
   }
 
-  @Post('withdraw-from-mint')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Withdraw harvested fees from mint account to OPS wallet' })
-  @ApiResponse({ status: 200, description: 'Fees withdrawn successfully' })
-  async withdrawFromMint(): Promise<{ signature: string }> {
-    this.logger.log(`Withdrawing fees from mint to OPS wallet`);
-    const signature = await this.feeHarvesterService.withdrawFeesFromMint();
-    return { signature };
-  }
-
-  @Post('distribute-fees')
+  @Post('distribute-fees-from-transactions')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Distribute fees from OPS wallet to college/community wallets and burn' })
   @ApiResponse({ status: 200, description: 'Fees distributed successfully' })
-  async distributeFees(): Promise<DistributionResult> {
-    this.logger.log(`Distributing fees from OPS wallet`);
-    return await this.feeDistributorService.distributeFees();
+  async distributeFeesFromTransactions(): Promise<DistributionResult> {
+    this.logger.log(`Distributing fees from transactions`);
+    return await this.feeDistributorService.distributeFeesFromTransactions();
   }
 
-  @Get('distribution-summary')
+  @Get('pending-distribution-summary')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get summary of fee distribution' })
-  @ApiResponse({ status: 200, description: 'Distribution summary retrieved successfully' })
-  async getDistributionSummary() {
-    return await this.feeDistributorService.getDistributionSummary();
+  @ApiOperation({ summary: 'Get summary of pending fee distribution (harvested but not distributed)' })
+  @ApiResponse({ status: 200, description: 'Distribution summary retrieved successfully', schema: {
+    type: 'object',
+    properties: {
+      totalTransactionAmount: { type: 'number' },
+      collegeAmount: { type: 'number' },
+      burnAmount: { type: 'number' },
+      communityAmount: { type: 'number' },
+      linkedCollegeAmount: { type: 'number' },
+    }
+  } })
+  async getPendingDistributionSummary() {
+    return await this.feeDistributorService.getPendingDistributionSummary();
   }
 
   @Get('total-fees')
@@ -129,7 +128,7 @@ export class FeeManagementController {
     }
 
     // Step 2: Distribute fees from OPS wallet
-    const distributionResult = await this.feeDistributorService.distributeFees();
+    const distributionResult = await this.feeDistributorService.distributeFeesFromTransactions();
 
     this.logger.log('Complete fee processing cycle finished');
     return {
@@ -146,6 +145,15 @@ export class FeeManagementController {
   async getUnharvestedTransactionsCount(): Promise<{ count: number }> {
     const count = await this.feeHarvesterService.getUnharvestedTransactionsCount();
     return { count };
+  }
+
+  @Get('unharvested-accounts-summary')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get summary of unharvested accounts' })
+  @ApiResponse({ status: 200, description: 'Summary retrieved successfully' })
+  async getUnharvestedAccountsSummary(): Promise<{ accounts: PublicKey[], count: number, amount: number }> {
+    return await this.feeHarvesterService.getUnharvestedAccountsSummary();
   }
 
   @Get('unharvested-transactions')
@@ -191,6 +199,23 @@ export class FeeManagementController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually mark transactions as fee_harvested' })
+  @ApiBody({
+    description: 'Transaction IDs to mark as fee_harvested',
+    schema: {
+      type: 'object',
+      properties: {
+        transactionIds: {
+          type: 'array',
+          items: {
+            type: 'number',
+          },
+          description: 'Array of transaction IDs to mark as fee_harvested',
+          example: [1, 2, 3, 4, 5]
+        }
+      },
+      required: ['transactionIds']
+    }
+  })
   @ApiResponse({ status: 200, description: 'Transactions marked as fee_harvested' })
   async markTransactionsAsHarvested(@Body() body: { transactionIds: number[] }): Promise<{ success: boolean }> {
     await this.feeHarvesterService.markTransactionsAsHarvested(body.transactionIds);
@@ -201,6 +226,23 @@ export class FeeManagementController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually mark transactions as fee_distributed' })
+  @ApiBody({
+    description: 'Transaction IDs to mark as fee_distributed',
+    schema: {
+      type: 'object',
+      properties: {
+        transactionIds: {
+          type: 'array',
+          items: {
+            type: 'number',
+          },
+          description: 'Array of transaction IDs to mark as fee_distributed',
+          example: [1, 2, 3, 4, 5]
+        }
+      },
+      required: ['transactionIds']
+    }
+  })
   @ApiResponse({ status: 200, description: 'Transactions marked as fee_distributed' })
   async markTransactionsAsDistributed(@Body() body: { transactionIds: number[] }): Promise<{ success: boolean }> {
     await this.feeDistributorService.markTransactionsAsDistributed(body.transactionIds);
@@ -219,8 +261,6 @@ export class FeeManagementController {
     this.logger.log('Manually triggering automated fee processing');
     return await this.feeSchedulerService.triggerManualProcessing();
   }
-
-  // Simple Job Log Endpoints
 
   @Get('job-logs')
   @UseGuards(JwtAuthGuard, AdminGuard)
