@@ -41,6 +41,21 @@ SMTP_PORT=
 SMTP_USER=
 SMTP_PASS=
 SMTP_FROM=
+
+# Blockchain listener
+HELIUS_API_KEY=
+WEBHOOK_AUTH_TOKEN=
+
+# Solana Configuration
+SOLANA_RPC_URL=https://api.devnet.solana.com
+TOKEN_MINT_ADDRESS=
+OPS_WALLET_SECRET_KEY=
+WITHDRAW_AUTHORITY_SECRET_KEY=
+MINT_AUTHORITY_SECRET_KEY=
+
+# Fee Processing Automation
+ENABLE_AUTOMATED_FEE_PROCESSING=true
+CRON_FEE_PROCESSING=0 */30 * * * *  # Every 30 minutes
 ```
 
 3) Run database migrations
