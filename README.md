@@ -1,4 +1,4 @@
-# Division One Crypto Frontend (D1C)
+# Division One Crypto Backend (D1C)
 
 Backend API for Division One Crypto built with NestJS, TypeORM, and PostgreSQL. It provides wallet + email + OTP authentication, fee management, college data, D1C wallet endpoints, transactions, stats, and webhooks. API documentation is available via Swagger.
 
