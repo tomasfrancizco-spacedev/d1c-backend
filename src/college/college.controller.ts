@@ -1,33 +1,51 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { CollegeService } from './college.service';
 import { CreateCollegeDto } from './dto/create-college.dto';
 import { UpdateCollegeDto } from './dto/update-college.dto';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { AdminGuard } from 'src/auth/guards/admin.guard';
 
 @Controller('college')
 export class CollegeController {
   constructor(private readonly collegeService: CollegeService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   create(@Body() createCollegeDto: CreateCollegeDto) {
     return this.collegeService.create(createCollegeDto);
   }
 
   @Get()
-  findAll() {
-    return this.collegeService.findAll();
+  @ApiOperation({ summary: 'Get all colleges' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of colleges to return (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, description: 'Number of colleges to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Colleges retrieved successfully' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  findAll(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    const limitNum = limit ? parseInt(limit) : 20;
+    const offsetNum = offset ? parseInt(offset) : 0;
+    return this.collegeService.findAll(limitNum, offsetNum);
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   findOne(@Param('id') id: string) {
     return this.collegeService.findOne(+id);
   }
 
-  @Patch(':id')
+  @Patch('/update/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   update(@Param('id') id: string, @Body() updateCollegeDto: UpdateCollegeDto) {
-    return this.collegeService.update(+id, updateCollegeDto);
+    return this.collegeService.updateCollege(+id, updateCollegeDto);
   }
 
-  @Delete(':id')
+  @Delete('/delete/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   remove(@Param('id') id: string) {
     return this.collegeService.remove(+id);
   }

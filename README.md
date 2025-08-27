@@ -1,98 +1,210 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Division One Crypto Frontend (D1C)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend API for Division One Crypto built with NestJS, TypeORM, and PostgreSQL. It provides wallet + email + OTP authentication, fee management, college data, D1C wallet endpoints, transactions, stats, and webhooks. API documentation is available via Swagger.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech stack
+- **Runtime**: Node.js, NestJS
+- **Database/ORM**: PostgreSQL, TypeORM
+- **Auth**: JWT, Email OTP
+- **Docs**: Swagger (OpenAPI)
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Quick start
 
-## Project setup
-
+1) Install dependencies
 ```bash
-$ npm install
+yarn install
 ```
 
-## Compile and run the project
+2) Create a `.env` file
+```env
+# Server
+PORT=3000
+API_VERSION=v1
+NODE_ENV=development
 
+# Swagger UI Authentication
+SWAGGER_USERNAME=admin
+SWAGGER_PASSWORD=your-secure-password
+
+# Postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=d1c
+
+# Auth
+JWT_SECRET=change-me-in-production
+JWT_EXPIRES_IN=1d
+
+# Email (optional for OTP emails; logs to console if missing)
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+
+# Blockchain listener
+HELIUS_API_KEY=
+WEBHOOK_AUTH_TOKEN=
+
+# Solana Configuration
+SOLANA_RPC_URL=https://api.devnet.solana.com
+TOKEN_MINT_ADDRESS=
+OPS_WALLET_SECRET_KEY=
+WITHDRAW_AUTHORITY_SECRET_KEY=
+MINT_AUTHORITY_SECRET_KEY=
+
+# Fee Processing Automation
+ENABLE_AUTOMATED_FEE_PROCESSING=true
+CRON_FEE_PROCESSING=0 */30 * * * *  # Every 30 minutes
+```
+
+3) Run database migrations
 ```bash
-# development
-$ npm run start
+yarn run migration:run -d data-source.ts
+```
 
+4) (Optional) Seed colleges
+```bash
+yarn run seed:colleges
+```
+
+5) Start the API
+```bash
 # watch mode
-$ npm run start:dev
+yarn start:dev
 
-# production mode
-$ npm run start:prod
+# or production (build + run)
+yarn run prestart:prod && yarn run start:prod
 ```
 
-## Run tests
+6) Open API docs (requires basic auth)
+```text
+http://localhost:3000/v1/doc-api
+Username: admin (or SWAGGER_USERNAME)
+Password: password (or SWAGGER_PASSWORD)
+```
 
+---
+
+## Scripts
+
+- `start`: run built app (`dist/src/main`)
+- `start:dev`: start in watch mode
+- `start:prod`: run built app (use with `prestart:prod`)
+- `prestart:prod`: build before prod start
+- `build`: compile TypeScript
+- `lint`: run ESLint with auto-fix
+- `test`, `test:watch`, `test:cov`, `test:e2e`: run tests
+- `migration:generate`: generate a TypeORM migration
+- `migration:create`: create an empty migration
+- `migration:run`: run pending migrations
+- `migration:revert`: revert last migration
+- `migration:show`: list executed/pending migrations
+- `db:reset`: drop and recreate schema then run all migrations
+- `seed:colleges`: seed `College` entities from `src/data/schools.json`
+- `pm2:deploy:app|start:app|stop:app|destroy:app|restart:app`: manage PM2 process using `app.json`
+
+Examples:
 ```bash
-# unit tests
-$ npm run test
+# Generate a migration (name + point CLI to data-source)
+yarn run migration:generate -- -n AddSomething -d data-source.ts
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Create an empty migration file
+yarn run migration:create -- -n ManualChange -d data-source.ts
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Configuration
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Environment variables
+- **Server**: `PORT`, `API_VERSION` (default `v1`), `NODE_ENV`
+- **Database**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+- **Auth**: `JWT_SECRET`, `JWT_EXPIRES_IN`
+- **Email (OTP)**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- **Swagger Auth**: `SWAGGER_USERNAME`, `SWAGGER_PASSWORD` (defaults: admin/password)
 
+Database config is defined in `data-source.ts`. For non-local hosts, SSL is enabled with `rejectUnauthorized: false`.
+
+---
+
+## API and modules
+
+Global prefix: `v1`. Swagger docs at `/v1/doc-api`.
+
+- `auth/`: wallet + email + OTP authentication, JWT issuance
+- `user/`: user-related endpoints
+- `college/`: colleges CRUD + seeding support
+- `d1c-wallet/`: D1C wallet-related endpoints
+- `fee-management/`: fees entities, harvesting services and tasks
+- `transaction/`: transactions endpoints and entities
+- `stats/`: stats endpoints and entities
+- `webhooks/`: inbound webhook handlers
+
+Authentication overview:
+- `POST /v1/auth/wallet-signin`: start login; sends OTP email (or logs to console in dev)
+- `POST /v1/auth/verify-otp`: verify OTP and receive JWT
+- Bearer auth is used for protected routes
+
+Open the guides for details:
+- `guides/AUTH_IMPLEMENTATION.md`
+- `guides/login_flow.md`
+- `guides/login_mostaza.md`
+
+---
+
+## Development
+
+### Linting and formatting
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+yarn run lint
+yarn run format
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### PM2 (optional)
+```bash
+# Build and start with PM2
+yarn run pm2:deploy:app
 
-## Resources
+# Manage process
+yarn run pm2:restart:app
+yarn run pm2:stop:app
+yarn run pm2:destroy:app
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+---
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Project structure
 
-## Support
+```
+src/
+  auth/               # Auth controller, services, guards, DTOs
+  college/            # College entity, service, controller, DTOs
+  d1c-wallet/         # D1C wallet endpoints and services
+  fee-management/     # Fee entities and harvesting services
+  stats/              # Stats entities, service, controller
+  transaction/        # Transaction entity, service, controller
+  user/               # User entity, service, controller
+  webhooks/           # Webhooks service and controller
+  database/           # TypeORM migrations
+  data/               # Static data (schools, logos)
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## Troubleshooting
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- Ensure `.env` is present and DB is reachable
+- If using SSL to remote Postgres, variables must be correct; SSL is auto-enabled for non-local hosts
+- Use `yarn run db:reset` to recreate schema locally (DROPS ALL DATA)
+- OTP emails require SMTP config; otherwise OTPs are logged to the console in development
+
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is **UNLICENSED** and intended for internal use.

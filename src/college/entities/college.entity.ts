@@ -29,7 +29,10 @@ export class College {
   @Column({ type: 'varchar', length: 40 })
   primary: string;
 
-  @Column({ type: 'varchar', length: 40 })
+  @Column({ type: 'varchar', length: 44, unique: true })
   walletAddress: string;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  logo: string | null;
   
 }

@@ -1,103 +1,202 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeleteResult, Repository } from 'typeorm';
+import { DeepPartial, DeleteResult, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { College } from '../college/entities/college.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-  ) {}
+    @InjectRepository(College) private readonly collegeRepository: Repository<College>,
+  ) { }
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    const user = this.userRepository.create({
-      email: createUserDto.email,
-      wallet: createUserDto.wallet,
-      isActive: createUserDto.isActive,
-      lastLogin: new Date(),
-      currentLinkedCollege: createUserDto.currentLinkedCollege,
-      linkedCollegeHistory: createUserDto.linkedCollegeHistory,
-    });
-    
-    return await this.userRepository.save(user);
+    try {
+      let currentLinkedCollege: College | null = null;
+
+      if (createUserDto.currentLinkedCollegeId) {
+        currentLinkedCollege = await this.collegeRepository.findOne({
+          where: { id: createUserDto.currentLinkedCollegeId }
+        });
+
+        if (!currentLinkedCollege) {
+          throw new HttpException(
+            'College not found',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      const user = await this.userRepository.save({
+        walletAddress: createUserDto.walletAddress,
+        emails: createUserDto.emails,
+        lastLogin: createUserDto.lastLogin,
+        isActive: createUserDto.isActive,
+        currentLinkedCollege: currentLinkedCollege,
+        otpCode: createUserDto.otpCode,
+        otpExpiration: createUserDto.otpExpiration,
+      } as DeepPartial<User>);
+
+      return user;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to create user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
-  async findAllUser(): Promise<User[]> {
-    return await this.userRepository.find();
+  async findAllUser(limit: number, offset: number): Promise<{ success: boolean, data: User[], total: number, limit: number, offset: number }> {
+    try {
+      const [users, total] = await this.userRepository.findAndCount({
+        relations: ['currentLinkedCollege'],
+        skip: offset,
+        take: limit,
+      });
+      return {
+        success: true,
+        data: users,
+        total: total,
+        limit: limit,
+        offset: offset,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: error.message,
+        total: 0,
+        limit: limit,
+        offset: offset,
+      };
+    }
   }
 
-  /**
-   * this function used to get data of user whose id is passed in parameter
-   * @param id is type of number, which represent the id of user.
-   * @returns promise of user
-   */
   async viewUser(id: number): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { id } });
+    try {
+      const user = await this.userRepository.findOne({ where: { id }, relations: ['currentLinkedCollege'] });
+      if (!user) {
+        return null;
+      }
+      return user;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to view user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
-  /**
-   * this function is used to find a user by email
-   * @param email string representing the user's email
-   * @returns promise of user or null
-   */
-  async findUserByEmail(email: string): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { email } });
+  async findUsersByEmail(email: string): Promise<User[] | null> {
+    try {
+      const users = await this.userRepository
+        .createQueryBuilder('user')
+        .where(':email = ANY(user.emails)', { email })
+        .getMany();
+      if (!users) {
+        return null;
+      }
+      return users;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to find users by email. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
-  /**
-   * this function updates the lastLogin timestamp when user logs in
-   * @param userId the ID of the user logging in
-   * @returns promise of updated user
-   */
+  async findUserByWalletAddress(walletAddress: string): Promise<User | null> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { walletAddress },
+        relations: ['currentLinkedCollege']
+      });
+      if (!user) {
+        return null;
+      }
+      return user;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to find user by wallet address. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   async updateLastLogin(userId: number): Promise<User | null> {
-    await this.userRepository.update(userId, { lastLogin: new Date() });
-    return await this.viewUser(userId);
-  }
-
-  /**
-   * this function handles user login - creates user on first login or updates lastLogin
-   * @param email user's email
-   * @param createUserDto user data for first-time login
-   * @returns promise of user
-   */
-  async handleUserLogin(email: string, createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.findUserByEmail(email);
-    
-    if (existingUser) {
-      // User exists, update lastLogin
-      const updatedUser = await this.updateLastLogin(existingUser.id);
-      return updatedUser || existingUser; // Return updated user or fallback to existing user
-    } else {
-      // First login, create new user
-      return await this.createUser(createUserDto);
+    try {
+      const updatedUser = await this.userRepository.update(userId, { lastLogin: new Date() });
+      if (updatedUser.affected && updatedUser.affected > 0) {
+        return await this.viewUser(userId);
+      }
+      return null;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to update last login. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
-  /**
-   * this function is used to updated specific user whose id is passed in
-   * parameter along with passed updated data
-   * @param id is type of number, which represent the id of user.
-   * @param updateUserDto this is partial type of createUserDto.
-   * @returns promise of update user
-   */
+  async handleUserLogin(walletAddress: string, createUserDto: CreateUserDto): Promise<User> {
+    try {
+      const existingUser = await this.findUserByWalletAddress(walletAddress);
+
+      if (existingUser) {
+        const updatedUser = await this.updateLastLogin(existingUser.id);
+        return updatedUser || existingUser;
+      } else {
+        return await this.createUser(createUserDto);
+      }
+    } catch (error) {
+      throw new HttpException(
+        'Failed to handle user login. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User | null> {
-    const updateResult = await this.userRepository.update(id, updateUserDto);
-    
-    if (updateResult.affected && updateResult.affected > 0) {
-      return await this.viewUser(id);
+    try {
+      const updateResult = await this.userRepository.update(id, updateUserDto);
+      if (updateResult.affected && updateResult.affected > 0) {
+        return await this.viewUser(id);
+      }
+      return null;
+    } catch (error) {
+      console.error('Update failed:', error);
+      throw new HttpException(
+        'Failed to update user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    
-    return null;
   }
 
-  /**
-   * this function is used to remove or delete user from database.
-   * @param id is the type of number, which represent id of user
-   * @returns number of rows deleted or affected
-   */
-  async removeUser(id: number): Promise<DeleteResult> {
-    return await this.userRepository.delete(id);
+  async removeUser(id: number): Promise<DeleteResult | null> {
+    try {
+      const deletedUser = await this.userRepository.delete(id);
+      if (deletedUser.affected && deletedUser.affected > 0) {
+        return deletedUser;
+      }
+      return null;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to remove user. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async findAllAdmins(): Promise<User[]> {
+    try {
+      return await this.userRepository.find({ where: { isAdmin: true }, relations: ['currentLinkedCollege'] });
+    } catch (error) {
+      throw new HttpException(
+        'Failed to find all admins. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }
