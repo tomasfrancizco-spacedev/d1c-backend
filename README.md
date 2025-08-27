@@ -24,6 +24,10 @@ PORT=3000
 API_VERSION=v1
 NODE_ENV=development
 
+# Swagger UI Authentication
+SWAGGER_USERNAME=admin
+SWAGGER_PASSWORD=your-secure-password
+
 # Postgres
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
@@ -77,9 +81,11 @@ yarn start:dev
 yarn run prestart:prod && yarn run start:prod
 ```
 
-6) Open API docs
+6) Open API docs (requires basic auth)
 ```text
 http://localhost:3000/v1/doc-api
+Username: admin (or SWAGGER_USERNAME)
+Password: password (or SWAGGER_PASSWORD)
 ```
 
 ---
@@ -120,6 +126,7 @@ yarn run migration:create -- -n ManualChange -d data-source.ts
 - **Database**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - **Auth**: `JWT_SECRET`, `JWT_EXPIRES_IN`
 - **Email (OTP)**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- **Swagger Auth**: `SWAGGER_USERNAME`, `SWAGGER_PASSWORD` (defaults: admin/password)
 
 Database config is defined in `data-source.ts`. For non-local hosts, SSL is enabled with `rejectUnauthorized: false`.
 
