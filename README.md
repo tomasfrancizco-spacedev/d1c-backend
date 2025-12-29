@@ -3,6 +3,7 @@
 Backend API for Division One Crypto built with NestJS, TypeORM, and PostgreSQL. It provides wallet + email + OTP authentication, fee management, college data, D1C wallet endpoints, transactions, stats, and webhooks. API documentation is available via Swagger.
 
 ## Tech stack
+
 - **Runtime**: Node.js, NestJS
 - **Database/ORM**: PostgreSQL, TypeORM
 - **Auth**: JWT, Email OTP
@@ -12,12 +13,14 @@ Backend API for Division One Crypto built with NestJS, TypeORM, and PostgreSQL. 
 
 ## Quick start
 
-1) Install dependencies
+1. Install dependencies
+
 ```bash
 yarn install
 ```
 
-2) Create a `.env` file
+2. Create a `.env` file
+
 ```env
 # Server
 PORT=3000
@@ -62,17 +65,20 @@ ENABLE_AUTOMATED_FEE_PROCESSING=true
 CRON_FEE_PROCESSING=0 */30 * * * *  # Every 30 minutes
 ```
 
-3) Run database migrations
+3. Run database migrations
+
 ```bash
 yarn run migration:run -d data-source.ts
 ```
 
-4) (Optional) Seed colleges
+4. (Optional) Seed colleges
+
 ```bash
 yarn run seed:colleges
 ```
 
-5) Start the API
+5. Start the API
+
 ```bash
 # watch mode
 yarn start:dev
@@ -81,7 +87,8 @@ yarn start:dev
 yarn run prestart:prod && yarn run start:prod
 ```
 
-6) Open API docs (requires basic auth)
+6. Open API docs (requires basic auth)
+
 ```text
 http://localhost:3000/v1/doc-api
 Username: admin (or SWAGGER_USERNAME)
@@ -109,6 +116,7 @@ Password: password (or SWAGGER_PASSWORD)
 - `pm2:deploy:app|start:app|stop:app|destroy:app|restart:app`: manage PM2 process using `app.json`
 
 Examples:
+
 ```bash
 # Generate a migration (name + point CLI to data-source)
 yarn run migration:generate -- -n AddSomething -d data-source.ts
@@ -122,6 +130,7 @@ yarn run migration:create -- -n ManualChange -d data-source.ts
 ## Configuration
 
 ### Environment variables
+
 - **Server**: `PORT`, `API_VERSION` (default `v1`), `NODE_ENV`
 - **Database**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - **Auth**: `JWT_SECRET`, `JWT_EXPIRES_IN`
@@ -146,11 +155,13 @@ Global prefix: `v1`. Swagger docs at `/v1/doc-api`.
 - `webhooks/`: inbound webhook handlers
 
 Authentication overview:
+
 - `POST /v1/auth/wallet-signin`: start login; sends OTP email (or logs to console in dev)
 - `POST /v1/auth/verify-otp`: verify OTP and receive JWT
 - Bearer auth is used for protected routes
 
 Open the guides for details:
+
 - `guides/AUTH_IMPLEMENTATION.md`
 - `guides/login_flow.md`
 - `guides/login_mostaza.md`
@@ -160,12 +171,14 @@ Open the guides for details:
 ## Development
 
 ### Linting and formatting
+
 ```bash
 yarn run lint
 yarn run format
 ```
 
 ### PM2 (optional)
+
 ```bash
 # Build and start with PM2
 yarn run pm2:deploy:app
@@ -175,6 +188,34 @@ yarn run pm2:restart:app
 yarn run pm2:stop:app
 yarn run pm2:destroy:app
 ```
+
+---
+
+## Deployment to AWS Elastic Beanstalk
+
+The project includes a GitHub Actions workflow for automatic deployment to AWS Elastic Beanstalk using OIDC authentication.
+
+### Setup
+
+1. **Create Elastic Beanstalk Application and Environment** in AWS Console
+   - Platform: Node.js (latest version)
+   - Configure environment variables in Beanstalk Console (all production env vars)
+
+2. **Configure GitHub Secrets**
+   - `AWS_ROLE_ARN`: IAM role ARN for OIDC authentication
+   - `AWS_REGION`: AWS region
+   - `EB_APPLICATION_NAME`: Elastic Beanstalk application name
+   - `EB_ENVIRONMENT_NAME`: Elastic Beanstalk environment name
+
+3. **Automatic Deployment**
+   - Deploys automatically on push to `main` branch
+   - The workflow builds, packages, and deploys the application
+
+### Configuration Files
+
+- `Procfile`: Application startup command
+- `.ebextensions/`: Beanstalk configuration files
+- `.ebignore`: Files excluded from deployment
 
 ---
 
